@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TarsusAI - Akıllı Tarım ve Ziraat Danışmanı</title>
+    <!-- Tailwind CSS, FontAwesome İkonları ve Markdown Parser (marked.js) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #022c22; /* Koyu Yeşil Çam Tarzı */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #064e3b;
+            border-radius: 99px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #10b981;
+        }
+        @keyframes spin-slow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin-slow 15s linear infinite;
+        }
+
+        /* === Markdown İçerik Biçimlendirmesi === */
+        /* Yapay zekadan gelen yazıların düzgün render edilmesi için gerekli CSS stilleri */
+        .ai-text-container p {
+            margin-bottom: 0.75rem;
+        }
+        .ai-text-container p:last-child {
+            margin-bottom: 0;
+        }
+        .ai-text-container strong {
+            color: #ffffff;
+            font-weight: 700;
+        }
+        .ai-text-container ul {
+            list-style-type: disc;
+            margin-left: 1.25rem;
+            margin-bottom: 0.75rem;
+        }
+        .ai-text-container li {
+            margin-bottom: 0.25rem;
+        }
+        .ai-text-container h3, .ai-text-container h4 {
+            font-size: 1.1rem;
+            font-weight: 850;
+            color: #34d399;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+            padding-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-tr from-stone-950 via-emerald-950 to-green-950 text-emerald-50 flex flex-col h-screen font-sans antialiased overflow-hidden">
+
+    <!-- Üst Menü (Header) - Tarım Yeşili Cam Efektli -->
+    <header class="backdrop-blur-md bg-stone-900/80 border-b border-emerald-900/30 p-4 sticky top-0 z-50 flex items-center justify-between shadow-lg shadow-emerald-950/20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-green-500 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-emerald-500/30">
+                <i class="fa-solid fa-seedling"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg tracking-wider bg-gradient-to-r from-emerald-200 via-green-300 to-white bg-clip-text text-transparent">TarsusAI Tarım</h1>
+                <p class="text-xs text-emerald-400 flex items-center font-medium">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 mr-2 animate-pulse shadow-md shadow-emerald-500/50"></span>Ziraat Danışmanı Çevrimiçi
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="text-xs font-semibold text-emerald-300 bg-emerald-950/80 px-3.5 py-1.5 rounded-xl border border-emerald-900/50 shadow-inner">Tarsus Bölge Uzmanı</span>
+        </div>
+    </header>
+
+    <!-- Ana Çalışma Alanı (Üç Sütunlu Grid Yapısı) -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden max-w-7xl mx-auto w-full p-4 gap-4">
+        
+        <!-- Sol Panel: Canlı Hava Durumu ve Uyarılar -->
+        <aside class="w-full lg:w-72 flex flex-col space-y-4 shrink-0 overflow-y-auto lg:max-h-none max-h-[200px] pb-2 lg:pb-0">
+            <!-- Hava Durumu Widget'ı -->
+            <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-4 shadow-xl">
+                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                    <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
+                        <i class="fa-solid fa-cloud-sun mr-2"></i> Tarsus Canlı Hava
+                    </span>
+                    <span class="text-[10px] text-slate-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/50">Canlı Veri</span>
+                </div>
+                
+                <!-- Hava Durumu İçeriği -->
+                <div id="weather-widget-content" class="space-y-3">
+                    <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
+                        <i class="fa-solid fa-spinner animate-spin"></i>
+                        <span>Veriler yükleniyor...</span>
+                    </div>
+                </div>
+
+                <!-- Tarımsal Öneriler / Uyarılar Bölümü -->
+                <div class="border-t border-emerald-900/25 pt-3">
+                    <h4 class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center">
+                        <i class="fa-solid fa-triangle-exclamation mr-1.5 text-amber-500"></i> Bölgesel Tarım Uyarısı
+                    </h4>
+                    <div id="agro-alert-box" class="bg-emerald-950/20 border border-emerald-900/50 rounded-xl p-3 text-xs leading-relaxed text-slate-300">
+                        Analiz ediliyor...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarsus Bölgesi Tarımsal Ek Bilgi -->
+            <div class="hidden lg:flex flex-col bg-stone-900/60 backdrop-blur-md border border-emerald-900/20 rounded-2xl p-4 text-xs space-y-2 text-slate-300 shadow-xl">
+                <span class="font-bold text-emerald-400 flex items-center">
+                    <i class="fa-solid fa-wheat-awn mr-2"></i> Bölge Toprak Yapısı
+                </span>
+                <p class="leading-relaxed">Tarsus ovası genel olarak zengin alüvyal, killi-tınlı topraklara sahiptir. Taban suyunun yüksek olduğu düz alanlarda kök boğulmalarına karşı drenaja, kireçli yamaçlarda ise erozyon kontrolüne dikkat edilmelidir.</p>
+                <div class="pt-2 border-t border-emerald-900/20 flex items-center justify-between text-[10px] text-emerald-500 font-semibold">
+                    <span>pH Seviyesi: ~7.4 - 8.1</span>
+                    <span>Kireç: Orta-Yüksek</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Orta Panel: Sohbet Alanı (Merkez Sütun) -->
+        <main class="flex-1 bg-stone-900/30 border border-emerald-900/10 rounded-2xl overflow-hidden flex flex-col relative shadow-inner">
+            <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 flex flex-col">
+                
+                <!-- Tarım Karşılama Alanı -->
+                <div id="welcome-hero" class="text-center py-6 space-y-4 my-auto">
+                    <div class="inline-flex p-3 rounded-full bg-emerald-950/50 border border-emerald-900/30 text-emerald-400 mb-2 animate-bounce">
+                        <i class="fa-solid fa-wheat-awn text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-white">Yapay Zeka ile Bereketli Mahsuller</h2>
+                    <p class="text-slate-300 text-xs md:text-sm max-w-md mx-auto">Tarsus yöresine özel ziraat mühendisi asistanınız hazır. Merak ettiğiniz soruyu sorabilir, bitki/hastalık görseli yükleyebilir veya aşağıdaki hızlı butonlara tıklayabilirsiniz.</p>
+                    
+                    <!-- Tarımsal Hızlı Soru Butonları -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl mx-auto pt-4 px-2">
+                        <button onclick="sendQuickQuestion('Tarsus Beyazı Üzümünde külleme hastalığıyla nasıl mücadele edilir?')" class="bg-stone-900/80 hover:bg-emerald-950/40 border border-emerald-900/30 hover:border-emerald-500/50 p-3.5 rounded-xl text-left text-xs md:text-sm text-slate-300 transition-all duration-300 shadow-sm flex items-center space-x-3">
+                            <i class="fa-solid fa-wine-glass text-emerald-400"></i>
+                            <span>Tarsus Beyazı Üzümü Bakımı</span>
+                        </button>
+                        <button onclick="sendQuickQuestion('Sarıulak zeytininde zeytin sineği için ne zaman ve nasıl önlem almalıyım?')" class="bg-stone-900/80 hover:bg-emerald-950/40 border border-emerald-900/30 hover:border-emerald-500/50 p-3.5 rounded-xl text-left text-xs md:text-sm text-slate-300 transition-all duration-300 shadow-sm flex items-center space-x-3">
+                            <i class="fa-solid fa-leaf text-lime-400"></i>
+                            <span>Sarıulak Zeytini ve Sinekle Mücadele</span>
+                        </button>
+                        <button onclick="sendQuickQuestion('Narenciye bahçemde unlu bit zararlısı gördüm, ne yapmalıyım?')" class="bg-stone-900/80 hover:bg-emerald-950/40 border border-emerald-900/30 hover:border-emerald-500/50 p-3.5 rounded-xl text-left text-xs md:text-sm text-slate-300 transition-all duration-300 shadow-sm flex items-center space-x-3">
+                            <i class="fa-solid fa-lemon text-amber-400"></i>
+                            <span>Narenciye Hastalıkları ve Çözümler</span>
+                        </button>
+                        <button onclick="sendQuickQuestion('Tarsus ikliminde sulama ve gübreleme planlamasını nasıl yapmalıyım?')" class="bg-stone-900/80 hover:bg-emerald-950/40 border border-emerald-900/30 hover:border-emerald-500/50 p-3.5 rounded-xl text-left text-xs md:text-sm text-slate-300 transition-all duration-300 shadow-sm flex items-center space-x-3">
+                            <i class="fa-solid fa-droplet text-blue-400"></i>
+                            <span>Sulama ve Gübreleme Önerileri</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Sağ Panel: Hal Fiyatları ve Aylık Tarım Ajandası -->
+        <aside class="hidden lg:flex flex-col w-72 shrink-0 space-y-4 overflow-y-auto">
+            
+            <!-- Canlı Hal Borsa Fiyatları -->
+            <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl shadow-emerald-950/10">
+                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                    <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
+                        <i class="fa-solid fa-scale-balanced mr-2"></i> Tarsus Hal Fiyatları
+                    </span>
+                    <span class="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/45 font-semibold">Güncel</span>
+                </div>
+                
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍇 Tarsus Beyazı Üzüm</span>
+                        <span class="font-bold text-emerald-400">85 - 100 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🫒 Sarıulak Zeytinyağı</span>
+                        <span class="font-bold text-emerald-400">280 - 320 TL <span class="text-[9px] text-slate-500">/Lt</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍅 Domates Salkım</span>
+                        <span class="font-bold text-emerald-400">15 - 40 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍉 Karpuz</span>
+                        <span class="font-bold text-emerald-400">8 - 12 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍑 Şeftali</span>
+                        <span class="font-bold text-emerald-400">60 - 80 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-500 italic text-center">Fiyatlar Mersin-Tarsus toptancı hali serbest piyasa ortalama verileridir.</p>
+            </div>
+
+            <!-- Haziran Dönemsel Ajanda Checklist -->
+            <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl">
+                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                    <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
+                        <i class="fa-solid fa-calendar-check mr-2"></i> Haziran Tarım Ajandası
+                    </span>
+                </div>
+                <div class="space-y-2.5 text-xs text-slate-300">
+                    <div class="flex items-start space-x-2">
+                        <input type="checkbox" checked disabled class="mt-0.5 accent-emerald-500 rounded">
+                        <span><strong>Bağlarda:</strong> Sürgün seyreltmesi ve salkım ucu budamasını tamamlayın.</span>
+                    </div>
+                    <div class="flex items-start space-x-2">
+                        <input type="checkbox" class="mt-0.5 accent-emerald-500 rounded">
+                        <span><strong>Zeytinlikte:</strong> Zeytin sineği zararlısı kontrolü için tuzakları kontrol edin.</span>
+                    </div>
+                    <div class="flex items-start space-x-2">
+                        <input type="checkbox" class="mt-0.5 accent-emerald-500 rounded">
+                        <span><strong>Narenciye:</strong> Unlu bit, kırmızı örümcek ve kabuklu bit takibini yapın.</span>
+                    </div>
+                    <div class="flex items-start space-x-2">
+                        <input type="checkbox" class="mt-0.5 accent-emerald-500 rounded">
+                        <span><strong>Sulama:</strong> Buharlaşmayı önlemek için sulamaları gece veya sabah erken yapın.</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Giriş Formu ve Telif (Footer) -->
+    <footer class="bg-stone-900/95 backdrop-blur-md border-t border-emerald-950/50 p-4 shadow-2xl shrink-0">
+        <div class="max-w-4xl mx-auto">
+            <form id="chat-form" class="flex flex-col space-y-3">
+                
+                <!-- Görüntü Önizleme Alanı (Yüklendiğinde Gösterilir) -->
+                <div id="image-preview-container" class="hidden flex items-center space-x-3 bg-stone-950/70 p-2.5 rounded-xl border border-emerald-900/40 max-w-max">
+                    <img id="image-preview" class="w-16 h-16 object-cover rounded-lg border border-emerald-500/40 shadow-inner" src="">
+                    <div class="text-xs">
+                        <p class="text-slate-300 font-semibold">Seçilen Görsel</p>
+                        <p class="text-[10px] text-emerald-400">Hastalık teşhisi için hazır.</p>
+                    </div>
+                    <button type="button" id="remove-image-btn" class="text-rose-500 hover:text-rose-400 p-2 transition-colors">
+                        <i class="fa-solid fa-trash-can text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Girdi ve Butonların Bulunduğu Alt Satır -->
+                <div class="flex items-center space-x-3">
+                    <!-- Fotoğraf Yükleme Butonu (İkonlu Kamera) -->
+                    <label for="image-input" class="cursor-pointer bg-stone-950/80 border border-emerald-900 rounded-xl p-4 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 transition-all shadow-inner flex items-center justify-center min-w-[56px] h-[56px]">
+                        <i class="fa-solid fa-camera text-lg"></i>
+                        <input type="file" id="image-input" accept="image/*" class="hidden">
+                    </label>
+
+                    <input 
+                        type="text" 
+                        id="user-input" 
+                        placeholder="Bitki hastalığı, gübreleme veya tarım hakkında sorun..." 
+                        class="flex-1 bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all shadow-inner text-sm md:text-base h-[56px]"
+                        required
+                        autocomplete="off"
+                    >
+                    <button 
+                        type="submit" 
+                        class="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 active:scale-95 text-white rounded-xl px-6 py-4 font-semibold transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center min-w-[56px] h-[56px]"
+                    >
+                        <i class="fa-solid fa-paper-plane text-lg"></i>
+                    </button>
+                </div>
+            </form>
+            <p class="text-center text-[10px] text-emerald-600/60 pt-3">© 2026 TarsusAI Tarım Teknolojileri Girişimi. Çiftçimizin Yanındayız.</p>
+        </div>
+    </footer>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const chatContainer = document.getElementById('chat-container');
+        const welcomeHero = document.getElementById('welcome-hero');
+        
+        // Görsel Seçme ve Önizleme Elemanları
+        const imageInput = document.getElementById('image-input');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const removeImageBtn = document.getElementById('remove-image-btn');
+        
+        let selectedImageBase64 = null; // API'ye gönderilecek görsel verisi
+
+        // Görsel Seçildiğinde Tetiklenen Fonksiyon (Base64'e dönüştürür)
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    selectedImageBase64 = event.target.result;
+                    imagePreview.src = selectedImageBase64;
+                    imagePreviewContainer.classList.remove('hidden');
+                    userInput.required = false; // Görsel yüklendiğinde metin zorunluluğunu kaldırır
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Görseli İptal Etme Butonu
+        removeImageBtn.addEventListener('click', function() {
+            imageInput.value = '';
+            selectedImageBase64 = null;
+            imagePreview.src = '';
+            imagePreviewContainer.classList.add('hidden');
+            userInput.required = true; // Sadece görsel kaldırıldığında metni zorunlu yapar
+        });
+
+        // Yapay Zeka Kelime Kelime Yazma Efekti (Streaming Effect)
+        function typeWriter(element, text, index = 0, speed = 8) {
+            if (index < text.length) {
+                // Karakter karakter düz metin ekle (HTML kırma ihtimaline karşı textContent kullanıyoruz)
+                element.textContent += text.charAt(index);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                setTimeout(() => typeWriter(element, text, index + 1, speed), speed);
+            } else {
+                // Yazma işlemi TAMAMEN bittiğinde, gelen metni Markdown formatına çeviriyoruz.
+                // Bu sayede kalın yazılar, listeler ve başlıklar ekranda kusursuz görünür.
+                element.innerHTML = marked.parse(text);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+
+        // Mesaj Ekleme Fonksiyonu (Görsel Desteği ile Birlikte)
+        function appendMessage(sender, text, imageUrl = null) {
+            if (welcomeHero) {
+                welcomeHero.style.display = 'none';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-start space-x-3 max-w-[85%] ${sender === 'user' ? 'ml-auto flex-row-reverse space-x-reverse animate-fade-in' : ''}`;
+
+            const avatarBg = sender === 'user' ? 'bg-stone-800 border border-stone-700' : 'bg-gradient-to-tr from-emerald-600 to-green-500';
+            const avatarText = sender === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-wheat-awn"></i>';
+            const contentBg = sender === 'user' ? 'bg-emerald-950/30 border border-emerald-900/50 shadow-md shadow-emerald-950/20' : 'bg-stone-900/90 border border-emerald-950/40 shadow-md';
+            const roundedClass = sender === 'user' ? 'rounded-2xl rounded-tr-none' : 'rounded-2xl rounded-tl-none';
+
+            // Mesaja görsel eklenmişse HTML'e dahil et
+            let imageHtml = '';
+            if (imageUrl) {
+                imageHtml = `<img src="${imageUrl}" class="max-w-xs max-h-48 rounded-lg mb-2 border border-emerald-900/50 object-cover shadow-md">`;
+            }
+
+            messageDiv.innerHTML = `
+                <div class="w-9 h-9 rounded-xl ${avatarBg} flex items-center justify-center text-xs font-bold shrink-0 text-white shadow-md">${avatarText}</div>
+                <div class="${contentBg} p-4 ${roundedClass} text-slate-200 text-sm md:text-base leading-relaxed flex flex-col">
+                    ${imageHtml}
+                    <span class="${sender === 'ai' ? 'ai-text-container' : 'user-text-container'}"></span>
+                </div>
+            `;
+            
+            chatContainer.appendChild(messageDiv);
+            
+            const textContainer = messageDiv.querySelector(sender === 'user' ? '.user-text-container' : '.ai-text-container');
+            
+            if (sender === 'user') {
+                textContainer.textContent = text;
+            } else {
+                typeWriter(textContainer, text);
+            }
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function sendQuickQuestion(questionText) {
+            userInput.value = questionText;
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+
+        // Form Gönderim İşlemi
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = userInput.value.trim();
+            const image = selectedImageBase64;
+            
+            if (!message && !image) return;
+
+            // Görseli ve metni ekranda göster
+            appendMessage('user', message, image);
+            
+            // Alanları Temizle
+            userInput.value = '';
+            if (image) {
+                imageInput.value = '';
+                selectedImageBase64 = null;
+                imagePreview.src = '';
+                imagePreviewContainer.classList.add('hidden');
+                userInput.required = true;
+            }
+
+            // Düşünüyor Loader'ı Ekle
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = "flex items-start space-x-3 max-w-[85%]";
+            loadingDiv.id = "temp-loader";
+            loadingDiv.innerHTML = `
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-500 flex items-center justify-center text-xs font-bold shrink-0 text-white shadow-md"><i class="fa-solid fa-wheat-awn"></i></div>
+                <div class="bg-stone-900/90 border border-emerald-950/40 p-4 rounded-2xl rounded-tl-none text-emerald-400 italic text-sm flex items-center space-x-2 shadow-md">
+                    <i class="fa-solid fa-spinner animate-spin"></i>
+                    <span>Ziraat Mühendisi düşünüyor...</span>
+                </div>
+            `;
+            chatContainer.appendChild(loadingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                // API'ye metin ve Base64 görselini gönderiyoruz
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: message, 
+                        image: image // Null veya base64 string
+                    })
+                });
+
+                const data = await response.json();
+                
+                const loader = document.getElementById('temp-loader');
+                if (loader) chatContainer.removeChild(loader);
+
+                if (response.ok) {
+                    appendMessage('ai', data.response);
+                } else {
+                    appendMessage('ai', "Hata oluştu: " + data.detail);
+                }
+            } catch (error) {
+                const loader = document.getElementById('temp-loader');
+                if (loader) chatContainer.removeChild(loader);
+                appendMessage('ai', "Sunucuya bağlanılamadı. Lütfen terminalinizi kontrol edin!");
+            }
+        });
+
+        // ================= TARSUS CANLI HAVA DURUMU SİSTEMİ =================
+
+        // WMO Hava Durumu Kodları Eşleştirmesi (Türkçe ve Güzel İkonlar)
+        const weatherCodes = {
+            0: { desc: "Açık / Güneşli", icon: "fa-sun text-amber-400 animate-spin-slow" },
+            1: { desc: "Çoğunlukla Açık", icon: "fa-cloud-sun text-amber-300" },
+            2: { desc: "Parçalı Bulutlu", icon: "fa-cloud-sun text-slate-300" },
+            3: { desc: "Kapalı / Bulutlu", icon: "fa-cloud text-slate-400" },
+            45: { desc: "Sisli", icon: "fa-smog text-slate-400" },
+            48: { desc: "Yoğun Sisli", icon: "fa-smog text-slate-500" },
+            51: { desc: "Hafif Çiseleme", icon: "fa-cloud-rain text-emerald-400" },
+            53: { desc: "Çiseleme", icon: "fa-cloud-rain text-emerald-500" },
+            55: { desc: "Yoğun Çiseleme", icon: "fa-cloud-rain text-emerald-600" },
+            61: { desc: "Hafif Yağmurlu", icon: "fa-cloud-showers-heavy text-blue-400" },
+            63: { desc: "Yağmurlu", icon: "fa-cloud-showers-heavy text-blue-500" },
+            65: { desc: "Şiddetli Yağış", icon: "fa-cloud-showers-heavy text-blue-600" },
+            71: { desc: "Hafif Kar Yağışlı", icon: "fa-snowflake text-sky-200" },
+            73: { desc: "Kar Yağışlı", icon: "fa-snowflake text-sky-300" },
+            75: { desc: "Yoğun Kar Yağışlı", icon: "fa-snowflake text-sky-400" },
+            80: { desc: "Hafif Sağanak", icon: "fa-cloud-sun-rain text-blue-300" },
+            81: { desc: "Sağanak Yağışlı", icon: "fa-cloud-showers-heavy text-blue-400" },
+            82: { desc: "Şiddetli Sağanak", icon: "fa-cloud-showers-heavy text-blue-500" },
+            95: { desc: "Fırtına / Yıldırım", icon: "fa-cloud-bolt text-amber-500" }
+        };
+
+        // Open-Meteo API'sinden Tarsus İçin Veri Çekme (Lat: 36.9167, Lon: 34.8956)
+        async function fetchTarsusWeather() {
+            try {
+                const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=36.9167&longitude=34.8956&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto');
+                if (!response.ok) throw new Error("API hatası");
+                const data = await response.json();
+                updateWeatherWidget(data);
+            } catch (error) {
+                console.error("Hava durumu yüklenemedi, yerel simülasyon yükleniyor:", error);
+                useFallbackWeather();
+            }
+        }
+
+        // Hava Durumu Verilerini Arayüze ve Algoritmaya Dağıtma
+        function updateWeatherWidget(data) {
+            const current = data.current;
+            const daily = data.daily;
+            const code = current.weather_code;
+            const weatherInfo = weatherCodes[code] || { desc: "Değişken", icon: "fa-cloud text-slate-300" };
+            
+            const temp = Math.round(current.temperature_2m);
+            const humidity = current.relative_humidity_2m;
+            const wind = Math.round(current.wind_speed_10m);
+            const tempMax = Math.round(daily.temperature_2m_max[0]);
+            const tempMin = Math.round(daily.temperature_2m_min[0]);
+
+            const widgetHtml = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-3xl"><i class="fa-solid ${weatherInfo.icon}"></i></div>
+                        <div>
+                            <div class="text-2xl font-black text-white">${temp}°C</div>
+                            <div class="text-xs text-slate-400 font-medium">${weatherInfo.desc}</div>
+                        </div>
+                    </div>
+                    <div class="text-right text-xs text-slate-400">
+                        <div>En Yüksek: <span class="text-emerald-300 font-bold">${tempMax}°C</span></div>
+                        <div>En Düşük: <span class="text-emerald-500 font-bold">${tempMin}°C</span></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 bg-stone-950/40 p-2.5 rounded-xl border border-emerald-950/60 text-xs">
+                    <div class="flex items-center space-x-2 text-slate-300">
+                        <i class="fa-solid fa-droplet text-blue-400 w-4"></i>
+                        <span>Nem: <strong class="text-white">${humidity}%</strong></span>
+                    </div>
+                    <div class="flex items-center space-x-2 text-slate-300">
+                        <i class="fa-solid fa-wind text-sky-400 w-4"></i>
+                        <span>Rüzgar: <strong class="text-white">${wind} km/s</strong></span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('weather-widget-content').innerHTML = widgetHtml;
+
+            // Akıllı Tarımsal Analiz ve Uyarı Algoritması
+            let alertText = "";
+            let alertBg = "";
+            
+            if (tempMin <= 3) {
+                alertText = "⚠️ <strong>KRİTİK DON UYARISI!</strong> Önümüzdeki saatlerde Tarsus ovasında don riski yüksek. Narenciye bahçeleri ve hassas Sarıulak zeytin fidanları için yağmurlama sulamayı hazırda tutun.";
+                alertBg = "bg-rose-950/40 border-rose-900/50 text-rose-200";
+            } else if (temp >= 36) {
+                alertText = "⚠️ <strong>AŞIRI SICAKLIK UYARISI!</strong> Bitkilerde su kaybı çok yüksek seviyede. Buharlaşmayı önlemek için sulamayı kesinlikle gündüz saatlerinde değil, sabah erken veya gün batımında yapın.";
+                alertBg = "bg-amber-950/40 border-amber-900/50 text-amber-200";
+            } else if (humidity >= 85 && temp >= 15 && temp <= 27) {
+                alertText = "⚠️ <strong>MANTARİ HASTALIK RİSKİ!</strong> Tarsus'ta mevcut nem oranı ve sıcaklık, asmalarda Külleme ve Mildiyö gelişimini hızlandırır. Koruyucu ilaçlamayı gözden geçirin.";
+                alertBg = "bg-orange-950/40 border-orange-900/50 text-orange-200";
+            } else if (wind >= 22) {
+                alertText = "⚠️ <strong>KUVVETLİ RÜZGAR UYARISI!</strong> Rüzgar hızı yüksek. Sürüklenme riski nedeniyle pülverizatör ile tarımsal ilaçlama yapılması önerilmez. İlaçlamayı sakin saate erteleyin.";
+                alertBg = "bg-cyan-950/40 border-cyan-900/50 text-cyan-200";
+            } else {
+                alertText = "✅ <strong>UYGUN KOŞULLAR:</strong> Tarsus bölgesinde tarımsal faaliyetler için hava koşulları ideal. Gübreleme, budama veya Sarıulak zeytinliklerinizde rutin çapalama işlerinizi rahatlıkla yapabilirsiniz.";
+                alertBg = "bg-emerald-950/40 border-emerald-900/50 text-emerald-200";
+            }
+
+            const alertBox = document.getElementById('agro-alert-box');
+            alertBox.className = `${alertBg} rounded-xl p-3 text-xs leading-relaxed transition-all`;
+            alertBox.innerHTML = alertText;
+        }
+
+        // Sayfa yüklendiğinde Tarsus hava durumunu çek
+        window.addEventListener('DOMContentLoaded', fetchTarsusWeather);
+    </script>
+</body>
+</html>
