@@ -1,0 +1,21 @@
+[Unit]
+Description=TarsusAI FastAPI Tarım Uygulaması
+# Ağ servisleri hazır olmadan uygulama başlamasın
+After=network.target
+
+[Service]
+# Bu VPS'te ayrı bir kullanıcı olmadığı için root ile çalıştırılıyor (tek-yönetici VPS)
+User=root
+# Uygulamanın VPS üzerinde yüklü olduğu tam dizin yolu
+WorkingDirectory=/root/tarsusai
+# Google Cloud ortamındaki kimlik bilgileri
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/root/tarsusai/google-key.json"
+# Uygulamanın sanal ortamdaki gunicorn ile başlatılması (4 işçi ile)
+ExecStart=/root/tarsusai/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 127.0.0.1:8000
+# Uygulama çökerse 5 saniye sonra otomatik yeniden başlasın
+Restart=always
+RestartSec=5
+
+[Install]
+# Çok kullanıcılı sistem modunda aktif olsun
+WantedBy=multi-user.target

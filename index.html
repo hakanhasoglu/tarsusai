@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TarsusAI - Akıllı Tarım ve Ziraat Danışmanı</title>
-    <!-- Tailwind CSS, FontAwesome İkonları ve Markdown Parser (marked.js) -->
+    <!-- Tailwind CSS, FontAwesome İkonları, Markdown Parser (marked.js) ve HTML Temizleyici (DOMPurify) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         ::-webkit-scrollbar {
@@ -61,7 +62,169 @@
         }
     </style>
 </head>
-<body class="bg-gradient-to-tr from-stone-950 via-emerald-950 to-green-950 text-emerald-50 flex flex-col h-screen font-sans antialiased overflow-hidden">
+<body class="bg-gradient-to-tr from-stone-950 via-emerald-950 to-green-950 text-emerald-50 flex flex-col justify-center h-screen h-[100dvh] font-sans antialiased overflow-hidden">
+
+    <!-- Üyelik / Giriş Ekranı -->
+    <div id="auth-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/95 backdrop-blur-sm p-4">
+        <div class="w-full max-w-sm bg-stone-900/95 border border-emerald-900/40 rounded-2xl shadow-2xl shadow-emerald-950/40 p-6 space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-600 to-green-500 flex items-center justify-center text-white text-2xl shadow-lg shadow-emerald-500/30">
+                    <i class="fa-solid fa-seedling"></i>
+                </div>
+                <h2 class="font-extrabold text-lg text-white pt-2">TarsusAI Tarım</h2>
+                <p class="text-xs text-emerald-400">Devam etmek için giriş yapın veya üye olun</p>
+            </div>
+
+            <div class="flex bg-stone-950/70 rounded-xl p-1 border border-emerald-900/30 text-sm font-semibold">
+                <button type="button" id="tab-login" class="flex-1 py-2 rounded-lg bg-emerald-600 text-white transition-all">Giriş Yap</button>
+                <button type="button" id="tab-register" class="flex-1 py-2 rounded-lg text-emerald-300 transition-all">Üye Ol</button>
+            </div>
+
+            <p id="auth-error" class="hidden text-xs text-rose-300 bg-rose-950/40 border border-rose-900/50 rounded-lg px-3 py-2"></p>
+
+            <form id="login-form" class="space-y-3">
+                <input type="text" id="login-identifier" placeholder="E-posta veya kullanıcı adı" required autocomplete="username"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <input type="password" id="login-password" placeholder="Şifre" required autocomplete="current-password"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-3 font-semibold transition-all shadow-lg shadow-emerald-600/30">Giriş Yap</button>
+            </form>
+
+            <form id="register-form" class="space-y-3 hidden">
+                <input type="email" id="register-email" placeholder="E-posta" required autocomplete="email"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <input type="text" id="register-username" placeholder="Kullanıcı adı" required autocomplete="username" minlength="3"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <input type="password" id="register-password" placeholder="Şifre (en az 6 karakter)" required autocomplete="new-password" minlength="6"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <input type="tel" id="register-phone" placeholder="Cep telefonu (opsiyonel)" autocomplete="tel"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <label class="flex items-start space-x-2 text-xs text-emerald-300/90 cursor-pointer select-none px-1">
+                    <input type="checkbox" id="register-sms-opt-in" class="mt-0.5 w-4 h-4 rounded border-emerald-900 bg-stone-950 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0">
+                    <span>Bölgesel hastalık/hava durumu uyarıları için bilgilendirme SMS'i almak istiyorum.</span>
+                </label>
+                <label class="flex items-start space-x-2 text-xs text-slate-300 cursor-pointer select-none px-1">
+                    <input type="checkbox" id="register-kvkk-accept" required class="mt-0.5 w-4 h-4 rounded border-emerald-900 bg-stone-950 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0">
+                    <span><button type="button" id="kvkk-open-link" class="text-emerald-400 underline hover:text-emerald-300">KVKK Aydınlatma Metni'ni</button> okudum, anladım, kabul ediyorum.</span>
+                </label>
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-3 font-semibold transition-all shadow-lg shadow-emerald-600/30">Üye Ol</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hesap Ayarları Modalı -->
+    <div id="account-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/80 backdrop-blur-sm p-4">
+        <div class="w-full max-w-sm bg-stone-900/95 border border-emerald-900/40 rounded-2xl shadow-2xl shadow-emerald-950/40 p-6 space-y-5">
+            <div class="flex items-center justify-between">
+                <h2 class="font-extrabold text-lg text-white flex items-center">
+                    <i class="fa-solid fa-user-gear mr-2 text-emerald-400"></i> Hesap Ayarları
+                </h2>
+                <button type="button" id="account-close-btn" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Hesap Bilgileri -->
+            <div class="bg-stone-950/60 border border-emerald-900/30 rounded-xl p-4 space-y-2 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Kullanıcı adı</span>
+                    <span id="account-username" class="font-semibold text-white"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">E-posta</span>
+                    <span id="account-email" class="font-semibold text-white"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Üye olma tarihi</span>
+                    <span id="account-created-at" class="font-semibold text-white"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Plan</span>
+                    <span id="account-plan" class="font-semibold text-white"></span>
+                </div>
+            </div>
+
+            <!-- Cep Telefonu -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold tracking-wider text-emerald-400 uppercase">Cep Telefonu</h3>
+                <p id="phone-error" class="hidden text-xs text-rose-300 bg-rose-950/40 border border-rose-900/50 rounded-lg px-3 py-2"></p>
+                <p id="phone-success" class="hidden text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-900/50 rounded-lg px-3 py-2"></p>
+                <form id="phone-form" class="space-y-3">
+                    <input type="tel" id="phone-input" placeholder="05XX XXX XX XX" autocomplete="tel"
+                        class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    <label class="flex items-start space-x-2 text-xs text-slate-300 cursor-pointer select-none">
+                        <input type="checkbox" id="sms-opt-in" class="mt-0.5 w-4 h-4 rounded border-emerald-900 bg-stone-950 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0">
+                        <span>Bölgesel hastalık/hava durumu uyarıları için bilgilendirme SMS'i almak istiyorum. (İşaretlemezseniz SMS gönderilmez.)</span>
+                    </label>
+                    <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-3 font-semibold transition-all shadow-lg shadow-emerald-600/30">Telefon Bilgisini Kaydet</button>
+                </form>
+            </div>
+
+            <div class="border-t border-emerald-900/25"></div>
+
+            <!-- Şifre Değiştirme -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold tracking-wider text-emerald-400 uppercase">Şifre Değiştir</h3>
+                <p id="account-error" class="hidden text-xs text-rose-300 bg-rose-950/40 border border-rose-900/50 rounded-lg px-3 py-2"></p>
+                <p id="account-success" class="hidden text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-900/50 rounded-lg px-3 py-2"></p>
+                <form id="change-password-form" class="space-y-3">
+                    <input type="password" id="current-password" placeholder="Mevcut şifre" required autocomplete="current-password"
+                        class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    <input type="password" id="new-password" placeholder="Yeni şifre (en az 6 karakter)" required autocomplete="new-password" minlength="6"
+                        class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    <input type="password" id="new-password-confirm" placeholder="Yeni şifre (tekrar)" required autocomplete="new-password" minlength="6"
+                        class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-3 font-semibold transition-all shadow-lg shadow-emerald-600/30">Şifreyi Güncelle</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- KVKK Aydınlatma Metni Modalı -->
+    <div id="kvkk-modal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-stone-950/85 backdrop-blur-sm p-4">
+        <div class="w-full max-w-lg max-h-[85vh] bg-stone-900/95 border border-emerald-900/40 rounded-2xl shadow-2xl shadow-emerald-950/40 flex flex-col">
+            <div class="flex items-center justify-between p-5 pb-3 border-b border-emerald-900/25 shrink-0">
+                <h2 class="font-extrabold text-base text-white flex items-center">
+                    <i class="fa-solid fa-shield-halved mr-2 text-emerald-400"></i> KVKK Aydınlatma Metni
+                </h2>
+                <button type="button" id="kvkk-close-btn" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto p-5 pt-3 space-y-3 text-xs leading-relaxed text-slate-300">
+                <p><strong class="text-emerald-400">1. Veri Sorumlusu</strong><br>
+                TarsusAI Tarım Teknolojileri Girişimi ("TarsusAI", "biz"), 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla, aşağıda açıklanan kişisel verilerinizi işlemektedir.
+                <span class="text-amber-400">[Şirket unvanı, vergi kimlik no ve tebligat adresi buraya eklenmelidir.]</span></p>
+
+                <p><strong class="text-emerald-400">2. İşlenen Kişisel Veriler</strong><br>
+                Kimlik ve iletişim bilgileri (kullanıcı adı, e-posta, cep telefonu), hesap bilgileri (şifre — geri döndürülemez biçimde şifrelenmiş olarak saklanır), sohbet uygulaması üzerinden gönderdiğiniz metin ve bitki/hastalık fotoğrafları, oturum ve teknik kullanım kayıtları (IP, tarayıcı bilgisi).</p>
+
+                <p><strong class="text-emerald-400">3. İşlenme Amaçları</strong><br>
+                Üyelik oluşturma ve kimlik doğrulama, yapay zeka destekli tarımsal danışmanlık hizmetinin sunulması, gönderdiğiniz bitki/hastalık fotoğraflarının teşhis amacıyla analiz edilmesi, talebiniz halinde bölgesel hastalık/hava durumu bilgilendirme SMS'i gönderilmesi, hizmet kalitesinin iyileştirilmesi ve yasal yükümlülüklerin yerine getirilmesi.</p>
+
+                <p><strong class="text-emerald-400">4. Kişisel Verilerin Aktarılması</strong><br>
+                Gönderdiğiniz metin ve fotoğraflar, yapay zeka analizinin gerçekleştirilebilmesi için Google LLC'ye ait Gemini/Vertex AI altyapısına iletilir; bu veriler yurt dışındaki sunucularda işlenebilir. Bunun dışında verileriniz, yasal zorunluluklar haricinde üçüncü taraflarla paylaşılmaz veya satılmaz.</p>
+
+                <p><strong class="text-emerald-400">5. Toplama Yöntemi ve Hukuki Sebep</strong><br>
+                Verileriniz, üyelik formu ve uygulama arayüzü üzerinden elektronik ortamda, KVKK m.5 kapsamında "açık rıza" ve "sözleşmenin kurulması/ifası için gerekli olma" hukuki sebeplerine dayanılarak toplanır.</p>
+
+                <p><strong class="text-emerald-400">6. KVKK m.11 Kapsamındaki Haklarınız</strong><br>
+                Kişisel verinizin işlenip işlenmediğini öğrenme, işlenmişse buna ilişkin bilgi talep etme, işlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme, yurt içi/yurt dışı aktarıldığı üçüncü kişileri bilme, eksik/yanlış işlenmişse düzeltilmesini isteme, KVKK'da öngörülen şartlarda silinmesini/yok edilmesini isteme, işlenen verilerin münhasıran otomatik sistemler ile analiz edilmesi nedeniyle aleyhinize bir sonuç ortaya çıkmasına itiraz etme ve kanuna aykırı işlenmesi sebebiyle zarara uğramanız halinde zararın giderilmesini talep etme haklarına sahipsiniz.</p>
+
+                <p><strong class="text-emerald-400">7. İletişim</strong><br>
+                Haklarınızı kullanmak için bizimle
+                <span class="text-amber-400">[iletişim e-postası buraya eklenmelidir]</span>
+                adresinden iletişime geçebilirsiniz.</p>
+
+                <p class="text-slate-500 italic pt-2 border-t border-emerald-900/20">Bu metin son olarak 23.08.2026 tarihinde güncellenmiştir.</p>
+            </div>
+            <div class="p-5 pt-3 border-t border-emerald-900/25 shrink-0">
+                <button type="button" id="kvkk-close-btn-2" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-2.5 font-semibold transition-all">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-content" style="display:contents;">
 
     <!-- Üst Menü (Header) - Tarım Yeşili Cam Efektli -->
     <header class="backdrop-blur-md bg-stone-900/80 border-b border-emerald-900/30 p-4 sticky top-0 z-50 flex items-center justify-between shadow-lg shadow-emerald-950/20 shrink-0">
@@ -77,13 +240,25 @@
             </div>
         </div>
         <div class="flex items-center space-x-2">
-            <span class="text-xs font-semibold text-emerald-300 bg-emerald-950/80 px-3.5 py-1.5 rounded-xl border border-emerald-900/50 shadow-inner">Tarsus Bölge Uzmanı</span>
+            <span class="text-xs font-semibold text-emerald-300 bg-emerald-950/80 px-3.5 py-1.5 rounded-xl border border-emerald-900/50 shadow-inner">Çukurova Bölge Uzmanı</span>
+            <a id="admin-panel-link" href="/admin" title="Yönetim Paneli" class="hidden text-xs font-semibold text-amber-300 hover:text-amber-200 bg-amber-950/40 hover:bg-amber-950/60 px-3 py-1.5 rounded-xl border border-amber-900/40 flex items-center transition-all">
+                <i class="fa-solid fa-user-shield"></i>
+            </a>
+            <button id="account-btn" title="Hesap Ayarları" type="button" class="hidden text-xs font-semibold text-white bg-stone-800/80 hover:bg-stone-800 px-3 py-1.5 rounded-xl border border-emerald-900/40 flex items-center transition-all">
+                <i class="fa-solid fa-circle-user mr-1.5 text-emerald-400"></i><span id="user-badge-name"></span>
+            </button>
+            <button id="logout-btn" title="Çıkış Yap" type="button" class="hidden text-xs font-semibold text-rose-300 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-950/60 px-3 py-1.5 rounded-xl border border-rose-900/40 transition-all">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+            <button id="login-prompt-btn" title="Giriş Yap / Üye Ol" type="button" class="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-xl border border-emerald-500/40 flex items-center transition-all">
+                <i class="fa-solid fa-right-to-bracket mr-1.5"></i>Giriş Yap
+            </button>
         </div>
     </header>
 
     <!-- Ana Çalışma Alanı (Üç Sütunlu Grid Yapısı) -->
-    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden max-w-7xl mx-auto w-full p-4 gap-4">
-        
+    <div class="flex-1 max-h-[800px] flex flex-col lg:flex-row overflow-hidden max-w-7xl mx-auto w-full p-4 gap-4">
+
         <!-- Sol Panel: Canlı Hava Durumu ve Uyarılar -->
         <aside class="w-full lg:w-72 flex flex-col space-y-4 shrink-0 overflow-y-auto lg:max-h-none max-h-[200px] pb-2 lg:pb-0">
             <!-- Hava Durumu Widget'ı -->
@@ -94,7 +269,7 @@
                     </span>
                     <span class="text-[10px] text-slate-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/50">Canlı Veri</span>
                 </div>
-                
+
                 <!-- Hava Durumu İçeriği -->
                 <div id="weather-widget-content" class="space-y-3">
                     <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
@@ -110,6 +285,37 @@
                     </h4>
                     <div id="agro-alert-box" class="bg-emerald-950/20 border border-emerald-900/50 rounded-xl p-3 text-xs leading-relaxed text-slate-300">
                         Analiz ediliyor...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bölge Ziraat Mühendisleri -->
+            <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl">
+                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                    <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
+                        <i class="fa-solid fa-user-tie mr-2"></i> Bölge Ziraat Mühendisleri
+                    </span>
+                </div>
+                <div id="engineers-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
+                        <i class="fa-solid fa-spinner animate-spin"></i>
+                        <span>Yükleniyor...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Günün İpucu Widget'ı -->
+            <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl">
+                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                    <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
+                        <i class="fa-solid fa-lightbulb mr-2"></i> Günün İpucu
+                    </span>
+                    <span class="text-[10px] text-slate-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/50">AI Üretimi</span>
+                </div>
+                <div id="daily-tip-content" class="space-y-2 text-xs leading-relaxed text-slate-300">
+                    <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
+                        <i class="fa-solid fa-spinner animate-spin"></i>
+                        <span>Bugünün ipucu hazırlanıyor...</span>
                     </div>
                 </div>
             </div>
@@ -130,15 +336,12 @@
         <!-- Orta Panel: Sohbet Alanı (Merkez Sütun) -->
         <main class="flex-1 bg-stone-900/30 border border-emerald-900/10 rounded-2xl overflow-hidden flex flex-col relative shadow-inner">
             <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 flex flex-col">
-                
+
                 <!-- Tarım Karşılama Alanı -->
                 <div id="welcome-hero" class="text-center py-6 space-y-4 my-auto">
-                    <div class="inline-flex p-3 rounded-full bg-emerald-950/50 border border-emerald-900/30 text-emerald-400 mb-2 animate-bounce">
-                        <i class="fa-solid fa-wheat-awn text-3xl"></i>
-                    </div>
                     <h2 class="text-2xl md:text-3xl font-extrabold text-white">Yapay Zeka ile Bereketli Mahsuller</h2>
                     <p class="text-slate-300 text-xs md:text-sm max-w-md mx-auto">Tarsus yöresine özel ziraat mühendisi asistanınız hazır. Merak ettiğiniz soruyu sorabilir, bitki/hastalık görseli yükleyebilir veya aşağıdaki hızlı butonlara tıklayabilirsiniz.</p>
-                    
+
                     <!-- Tarımsal Hızlı Soru Butonları -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl mx-auto pt-4 px-2">
                         <button onclick="sendQuickQuestion('Tarsus Beyazı Üzümünde külleme hastalığıyla nasıl mücadele edilir?')" class="bg-stone-900/80 hover:bg-emerald-950/40 border border-emerald-900/30 hover:border-emerald-500/50 p-3.5 rounded-xl text-left text-xs md:text-sm text-slate-300 transition-all duration-300 shadow-sm flex items-center space-x-3">
@@ -165,64 +368,84 @@
 
         <!-- Sağ Panel: Hal Fiyatları ve Aylık Tarım Ajandası -->
         <aside class="hidden lg:flex flex-col w-72 shrink-0 space-y-4 overflow-y-auto">
-            
+
             <!-- Canlı Hal Borsa Fiyatları -->
             <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl shadow-emerald-950/10">
                 <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
                     <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
                         <i class="fa-solid fa-scale-balanced mr-2"></i> Tarsus Hal Fiyatları
                     </span>
-                    <span class="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/45 font-semibold">Güncel</span>
+                    <span class="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/45 font-semibold">21.08.2026</span>
                 </div>
-                
+
                 <div class="space-y-2 text-xs">
                     <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
-                        <span class="text-slate-300 font-medium">🍇 Tarsus Beyazı Üzüm</span>
-                        <span class="font-bold text-emerald-400">85 - 100 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
-                    </div>
-                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
-                        <span class="text-slate-300 font-medium">🫒 Sarıulak Zeytinyağı</span>
-                        <span class="font-bold text-emerald-400">280 - 320 TL <span class="text-[9px] text-slate-500">/Lt</span></span>
-                    </div>
-                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
-                        <span class="text-slate-300 font-medium">🍅 Domates Salkım</span>
-                        <span class="font-bold text-emerald-400">15 - 40 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                        <span class="text-slate-300 font-medium">🥕 Havuç</span>
+                        <span class="font-bold text-emerald-400">6 - 10 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
                     </div>
                     <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
                         <span class="text-slate-300 font-medium">🍉 Karpuz</span>
-                        <span class="font-bold text-emerald-400">8 - 12 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                        <span class="font-bold text-emerald-400">6 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
                     </div>
                     <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
-                        <span class="text-slate-300 font-medium">🍑 Şeftali</span>
-                        <span class="font-bold text-emerald-400">60 - 80 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                        <span class="text-slate-300 font-medium">🍈 Kavun</span>
+                        <span class="font-bold text-emerald-400">5 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍋 Limon</span>
+                        <span class="font-bold text-emerald-400">15 - 20 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🌽 Taze Mısır</span>
+                        <span class="font-bold text-emerald-400">3 - 4 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍌 Muz (Yerli)</span>
+                        <span class="font-bold text-emerald-400">15 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍑 Nektarin</span>
+                        <span class="font-bold text-emerald-400">10 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🐉 Pitahaya</span>
+                        <span class="font-bold text-emerald-400">20 TL <span class="text-[9px] text-slate-500">/Adet</span></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
+                        <span class="text-slate-300 font-medium">🍇 Beyaz Üzüm</span>
+                        <span class="font-bold text-emerald-400">10 - 45 TL <span class="text-[9px] text-slate-500">/Kg</span></span>
                     </div>
                 </div>
-                <p class="text-[9px] text-slate-500 italic text-center">Fiyatlar Mersin-Tarsus toptancı hali serbest piyasa ortalama verileridir.</p>
+                <p class="text-[9px] text-slate-500 italic text-center">Fiyatlar Tarsus Hal Kompleksi 21.08.2026 verileridir. Kaynak: mersin.bel.tr</p>
             </div>
 
-            <!-- Haziran Dönemsel Ajanda Checklist -->
+            <!-- Zirai İlaç Bayileri -->
             <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl">
                 <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
                     <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
-                        <i class="fa-solid fa-calendar-check mr-2"></i> Haziran Tarım Ajandası
+                        <i class="fa-solid fa-shop mr-2"></i> Zirai İlaç Bayileri
                     </span>
                 </div>
-                <div class="space-y-2.5 text-xs text-slate-300">
-                    <div class="flex items-start space-x-2">
-                        <input type="checkbox" checked disabled class="mt-0.5 accent-emerald-500 rounded">
-                        <span><strong>Bağlarda:</strong> Sürgün seyreltmesi ve salkım ucu budamasını tamamlayın.</span>
+                <div id="dealers-list" class="space-y-2">
+                    <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
+                        <i class="fa-solid fa-spinner animate-spin"></i>
+                        <span>Yükleniyor...</span>
                     </div>
-                    <div class="flex items-start space-x-2">
-                        <input type="checkbox" class="mt-0.5 accent-emerald-500 rounded">
-                        <span><strong>Zeytinlikte:</strong> Zeytin sineği zararlısı kontrolü için tuzakları kontrol edin.</span>
-                    </div>
-                    <div class="flex items-start space-x-2">
-                        <input type="checkbox" class="mt-0.5 accent-emerald-500 rounded">
-                        <span><strong>Narenciye:</strong> Unlu bit, kırmızı örümcek ve kabuklu bit takibini yapın.</span>
-                    </div>
-                    <div class="flex items-start space-x-2">
-                        <input type="checkbox" class="mt-0.5 accent-emerald-500 rounded">
-                        <span><strong>Sulama:</strong> Buharlaşmayı önlemek için sulamaları gece veya sabah erken yapın.</span>
+                </div>
+            </div>
+
+            <!-- Aylık Tarım Ajandası (Yapay Zeka ile Otomatik Üretilir) -->
+            <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl">
+                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                    <span id="agenda-title" class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
+                        <i class="fa-solid fa-calendar-check mr-2"></i> Tarım Ajandası
+                    </span>
+                    <span class="text-[9px] text-slate-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/50">AI Üretimi</span>
+                </div>
+                <div id="agenda-content" class="space-y-2.5 text-xs text-slate-300">
+                    <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
+                        <i class="fa-solid fa-spinner animate-spin"></i>
+                        <span>Ajanda hazırlanıyor...</span>
                     </div>
                 </div>
             </div>
@@ -233,8 +456,13 @@
     <!-- Giriş Formu ve Telif (Footer) -->
     <footer class="bg-stone-900/95 backdrop-blur-md border-t border-emerald-950/50 p-4 shadow-2xl shrink-0">
         <div class="max-w-4xl mx-auto">
+            <p class="text-center text-[10px] text-amber-400/80 pb-1 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Yapay zeka önerileri bilgilendirme amaçlıdır; kesin teşhis ve uygulama için bölge ziraat mühendisinize danışın.
+            </p>
+            <p id="daily-limit-note" class="hidden text-center text-[10px] text-slate-500 pb-2"></p>
             <form id="chat-form" class="flex flex-col space-y-3">
-                
+
                 <!-- Görüntü Önizleme Alanı (Yüklendiğinde Gösterilir) -->
                 <div id="image-preview-container" class="hidden flex items-center space-x-3 bg-stone-950/70 p-2.5 rounded-xl border border-emerald-900/40 max-w-max">
                     <img id="image-preview" class="w-16 h-16 object-cover rounded-lg border border-emerald-500/40 shadow-inner" src="">
@@ -248,24 +476,28 @@
                 </div>
 
                 <!-- Girdi ve Butonların Bulunduğu Alt Satır -->
-                <div class="flex items-center space-x-3">
-                    <!-- Fotoğraf Yükleme Butonu (İkonlu Kamera) -->
-                    <label for="image-input" class="cursor-pointer bg-stone-950/80 border border-emerald-900 rounded-xl p-4 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 transition-all shadow-inner flex items-center justify-center min-w-[56px] h-[56px]">
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <!-- Fotoğraf Yükleme Butonları: Kamera ile Çek / Dosyadan Seç -->
+                    <label for="image-input-camera" title="Fotoğraf Çek" class="cursor-pointer bg-stone-950/80 border border-emerald-900 rounded-xl p-3 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 transition-all shadow-inner flex items-center justify-center shrink-0 min-w-[48px] sm:min-w-[52px] h-[68px]">
                         <i class="fa-solid fa-camera text-lg"></i>
-                        <input type="file" id="image-input" accept="image/*" class="hidden">
+                        <input type="file" id="image-input-camera" accept="image/*" capture="environment" class="hidden">
+                    </label>
+                    <label for="image-input-gallery" title="Dosyadan Seç" class="cursor-pointer bg-stone-950/80 border border-emerald-900 rounded-xl p-3 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 transition-all shadow-inner flex items-center justify-center shrink-0 min-w-[48px] sm:min-w-[52px] h-[68px]">
+                        <i class="fa-solid fa-image text-lg"></i>
+                        <input type="file" id="image-input-gallery" accept="image/*" class="hidden">
                     </label>
 
-                    <input 
-                        type="text" 
-                        id="user-input" 
-                        placeholder="Bitki hastalığı, gübreleme veya tarım hakkında sorun..." 
-                        class="flex-1 bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all shadow-inner text-sm md:text-base h-[56px]"
+                    <input
+                        type="text"
+                        id="user-input"
+                        placeholder="Bitki hastalığı, gübreleme veya tarım hakkında sorun..."
+                        class="flex-1 min-w-0 bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all shadow-inner text-sm md:text-base h-[68px]"
                         required
                         autocomplete="off"
                     >
-                    <button 
-                        type="submit" 
-                        class="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 active:scale-95 text-white rounded-xl px-6 py-4 font-semibold transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center min-w-[56px] h-[56px]"
+                    <button
+                        type="submit"
+                        class="shrink-0 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 active:scale-95 text-white rounded-xl px-6 py-4 font-semibold transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center min-w-[56px] h-[68px]"
                     >
                         <i class="fa-solid fa-paper-plane text-lg"></i>
                     </button>
@@ -275,22 +507,182 @@
         </div>
     </footer>
 
+    </div>
+
     <script>
+        // ================= ÜYELİK / GİRİŞ SİSTEMİ =================
+        const authOverlay = document.getElementById('auth-overlay');
+        const appContent = document.getElementById('app-content');
+        const tabLogin = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const authError = document.getElementById('auth-error');
+        const userBadgeName = document.getElementById('user-badge-name');
+        const accountBtn = document.getElementById('account-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const loginPromptBtn = document.getElementById('login-prompt-btn');
+        loginPromptBtn.addEventListener('click', () => {
+            switchAuthTab('register');
+            showAuthScreen();
+        });
+
+        function showAuthError(msg) {
+            authError.textContent = msg;
+            authError.classList.remove('hidden');
+        }
+        function clearAuthError() {
+            authError.classList.add('hidden');
+            authError.textContent = '';
+        }
+        function switchAuthTab(tab) {
+            clearAuthError();
+            const isLogin = tab === 'login';
+            loginForm.classList.toggle('hidden', !isLogin);
+            registerForm.classList.toggle('hidden', isLogin);
+            tabLogin.classList.toggle('bg-emerald-600', isLogin);
+            tabLogin.classList.toggle('text-white', isLogin);
+            tabLogin.classList.toggle('text-emerald-300', !isLogin);
+            tabRegister.classList.toggle('bg-emerald-600', !isLogin);
+            tabRegister.classList.toggle('text-white', !isLogin);
+            tabRegister.classList.toggle('text-emerald-300', isLogin);
+        }
+        tabLogin.addEventListener('click', () => switchAuthTab('login'));
+        tabRegister.addEventListener('click', () => switchAuthTab('register'));
+
+        // ================= KVKK AYDINLATMA METNİ MODALI =================
+        const kvkkModal = document.getElementById('kvkk-modal');
+        const kvkkOpenLink = document.getElementById('kvkk-open-link');
+        const kvkkCloseBtn = document.getElementById('kvkk-close-btn');
+        const kvkkCloseBtn2 = document.getElementById('kvkk-close-btn-2');
+
+        function openKvkkModal() {
+            kvkkModal.classList.remove('hidden');
+        }
+        function closeKvkkModal() {
+            kvkkModal.classList.add('hidden');
+        }
+        kvkkOpenLink.addEventListener('click', openKvkkModal);
+        kvkkCloseBtn.addEventListener('click', closeKvkkModal);
+        kvkkCloseBtn2.addEventListener('click', closeKvkkModal);
+        kvkkModal.addEventListener('click', (e) => {
+            if (e.target === kvkkModal) closeKvkkModal();
+        });
+
+        let currentUser = null;
+
+        function onAuthSuccess(user) {
+            currentUser = user;
+            authOverlay.classList.add('hidden');
+            userBadgeName.textContent = user.username;
+            accountBtn.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
+            loginPromptBtn.classList.add('hidden');
+            document.getElementById('admin-panel-link').classList.toggle('hidden', !user.is_admin);
+        }
+
+        function showAuthScreen() {
+            authOverlay.classList.remove('hidden');
+        }
+
+        // Ziyaretçi giriş yapmamış olsa bile sohbet ekranı direkt açılır;
+        // giriş/üyelik ekranı yalnızca bir mesaj göndermeye çalıştığında istenir.
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    onAuthSuccess(await res.json());
+                }
+            } catch (e) {
+                // Anonim gezinmeye devam — sessiz geç.
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearAuthError();
+            const identifier = document.getElementById('login-identifier').value.trim();
+            const password = document.getElementById('login-password').value;
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifier, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    onAuthSuccess(data);
+                } else {
+                    showAuthError(data.detail || 'Giriş yapılamadı.');
+                }
+            } catch (err) {
+                showAuthError('Sunucuya bağlanılamadı.');
+            }
+        });
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearAuthError();
+            const email = document.getElementById('register-email').value.trim();
+            const username = document.getElementById('register-username').value.trim();
+            const password = document.getElementById('register-password').value;
+            const phone = document.getElementById('register-phone').value.trim();
+            const smsOptIn = document.getElementById('register-sms-opt-in').checked;
+            const kvkkAccepted = document.getElementById('register-kvkk-accept').checked;
+            if (!kvkkAccepted) {
+                showAuthError('Devam etmek için KVKK Aydınlatma Metni\'ni onaylamanız gerekiyor.');
+                return;
+            }
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password, phone: phone || null, sms_opt_in: smsOptIn, kvkk_accepted: kvkkAccepted })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    onAuthSuccess(data);
+                } else {
+                    showAuthError(data.detail || 'Kayıt oluşturulamadı.');
+                }
+            } catch (err) {
+                showAuthError('Sunucuya bağlanılamadı.');
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+            } catch (e) {}
+            location.reload();
+        });
+
+        window.addEventListener('DOMContentLoaded', checkAuth);
+
         const chatForm = document.getElementById('chat-form');
         const userInput = document.getElementById('user-input');
         const chatContainer = document.getElementById('chat-container');
         const welcomeHero = document.getElementById('welcome-hero');
-        
+
+        const dailyLimitNote = document.getElementById('daily-limit-note');
+        function updateDailyLimitNote(remaining) {
+            dailyLimitNote.textContent = remaining > 0
+                ? `Bugün kalan ücretsiz soru hakkınız: ${remaining}`
+                : 'Günlük ücretsiz soru hakkınızı doldurdunuz, yarın tekrar deneyebilirsiniz.';
+            dailyLimitNote.classList.remove('hidden');
+        }
+
         // Görsel Seçme ve Önizleme Elemanları
-        const imageInput = document.getElementById('image-input');
+        const imageInputCamera = document.getElementById('image-input-camera');
+        const imageInputGallery = document.getElementById('image-input-gallery');
         const imagePreviewContainer = document.getElementById('image-preview-container');
         const imagePreview = document.getElementById('image-preview');
         const removeImageBtn = document.getElementById('remove-image-btn');
-        
+
         let selectedImageBase64 = null; // API'ye gönderilecek görsel verisi
 
         // Görsel Seçildiğinde Tetiklenen Fonksiyon (Base64'e dönüştürür)
-        imageInput.addEventListener('change', function(e) {
+        function handleImageSelect(e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -302,11 +694,14 @@
                 };
                 reader.readAsDataURL(file);
             }
-        });
+        }
+        imageInputCamera.addEventListener('change', handleImageSelect);
+        imageInputGallery.addEventListener('change', handleImageSelect);
 
         // Görseli İptal Etme Butonu
         removeImageBtn.addEventListener('click', function() {
-            imageInput.value = '';
+            imageInputCamera.value = '';
+            imageInputGallery.value = '';
             selectedImageBase64 = null;
             imagePreview.src = '';
             imagePreviewContainer.classList.add('hidden');
@@ -323,7 +718,7 @@
             } else {
                 // Yazma işlemi TAMAMEN bittiğinde, gelen metni Markdown formatına çeviriyoruz.
                 // Bu sayede kalın yazılar, listeler ve başlıklar ekranda kusursuz görünür.
-                element.innerHTML = marked.parse(text);
+                element.innerHTML = DOMPurify.sanitize(marked.parse(text));
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
         }
@@ -355,11 +750,11 @@
                     <span class="${sender === 'ai' ? 'ai-text-container' : 'user-text-container'}"></span>
                 </div>
             `;
-            
+
             chatContainer.appendChild(messageDiv);
-            
+
             const textContainer = messageDiv.querySelector(sender === 'user' ? '.user-text-container' : '.ai-text-container');
-            
+
             if (sender === 'user') {
                 textContainer.textContent = text;
             } else {
@@ -379,16 +774,24 @@
             e.preventDefault();
             const message = userInput.value.trim();
             const image = selectedImageBase64;
-            
+
             if (!message && !image) return;
+
+            // Anonim ziyaretçi mesaj göndermeye çalışınca giriş/üyelik ekranını iste
+            if (!currentUser) {
+                switchAuthTab('register');
+                showAuthScreen();
+                return;
+            }
 
             // Görseli ve metni ekranda göster
             appendMessage('user', message, image);
-            
+
             // Alanları Temizle
             userInput.value = '';
             if (image) {
-                imageInput.value = '';
+                imageInputCamera.value = '';
+                imageInputGallery.value = '';
                 selectedImageBase64 = null;
                 imagePreview.src = '';
                 imagePreviewContainer.classList.add('hidden');
@@ -414,21 +817,36 @@
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        message: message, 
+                    body: JSON.stringify({
+                        message: message,
                         image: image // Null veya base64 string
                     })
                 });
 
                 const data = await response.json();
-                
+
                 const loader = document.getElementById('temp-loader');
                 if (loader) chatContainer.removeChild(loader);
 
                 if (response.ok) {
                     appendMessage('ai', data.response);
+                    if (typeof data.remaining_today === 'number') {
+                        updateDailyLimitNote(data.remaining_today);
+                    } else {
+                        dailyLimitNote.textContent = 'Premium hesap: sınırsız soru hakkınız var.';
+                        dailyLimitNote.classList.remove('hidden');
+                    }
+                } else if (response.status === 429) {
+                    appendMessage('ai', data.detail);
                 } else {
                     appendMessage('ai', "Hata oluştu: " + data.detail);
+                    if (response.status === 401) {
+                        currentUser = null;
+                        accountBtn.classList.add('hidden');
+                        logoutBtn.classList.add('hidden');
+                        loginPromptBtn.classList.remove('hidden');
+                        showAuthScreen();
+                    }
                 }
             } catch (error) {
                 const loader = document.getElementById('temp-loader');
@@ -481,7 +899,7 @@
             const daily = data.daily;
             const code = current.weather_code;
             const weatherInfo = weatherCodes[code] || { desc: "Değişken", icon: "fa-cloud text-slate-300" };
-            
+
             const temp = Math.round(current.temperature_2m);
             const humidity = current.relative_humidity_2m;
             const wind = Math.round(current.wind_speed_10m);
@@ -518,7 +936,7 @@
             // Akıllı Tarımsal Analiz ve Uyarı Algoritması
             let alertText = "";
             let alertBg = "";
-            
+
             if (tempMin <= 3) {
                 alertText = "⚠️ <strong>KRİTİK DON UYARISI!</strong> Önümüzdeki saatlerde Tarsus ovasında don riski yüksek. Narenciye bahçeleri ve hassas Sarıulak zeytin fidanları için yağmurlama sulamayı hazırda tutun.";
                 alertBg = "bg-rose-950/40 border-rose-900/50 text-rose-200";
@@ -543,6 +961,267 @@
 
         // Sayfa yüklendiğinde Tarsus hava durumunu çek
         window.addEventListener('DOMContentLoaded', fetchTarsusWeather);
+
+        // ============ Günün İpucu ============
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str ?? '';
+            return div.innerHTML;
+        }
+
+        async function fetchDailyTip() {
+            const box = document.getElementById('daily-tip-content');
+            try {
+                const res = await fetch('/api/daily-tip');
+                if (!res.ok) throw new Error('İstek başarısız');
+                const data = await res.json();
+
+                box.innerHTML = `
+                    <div class="flex items-center flex-wrap gap-x-2 gap-y-1">
+                        <span class="text-emerald-300 font-bold">${escapeHtml(data.bitki)}</span>
+                        <span class="text-slate-500">·</span>
+                        <span class="text-amber-300 font-semibold">${escapeHtml(data.hastalik_zararli)}</span>
+                    </div>
+                    <p class="text-slate-300">${escapeHtml(data.ipucu)}</p>
+                    <p class="text-emerald-400/90 border-t border-emerald-900/25 pt-2 mt-2">
+                        <i class="fa-solid fa-shield-halved mr-1"></i>${escapeHtml(data.onlem)}
+                    </p>
+                `;
+            } catch (e) {
+                box.innerHTML = '<p class="text-rose-300">İpucu şu anda yüklenemedi.</p>';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', fetchDailyTip);
+
+        // ============ Aylık Tarım Ajandası (Otomatik, Yapay Zeka Üretimi) ============
+        async function fetchMonthlyAgenda() {
+            const titleEl = document.getElementById('agenda-title');
+            const box = document.getElementById('agenda-content');
+            try {
+                const res = await fetch('/api/monthly-agenda');
+                if (!res.ok) throw new Error('İstek başarısız');
+                const data = await res.json();
+
+                titleEl.innerHTML = `<i class="fa-solid fa-calendar-check mr-2"></i> ${escapeHtml(data.month_name)} Tarım Ajandası`;
+
+                if (!data.items || !data.items.length) {
+                    box.innerHTML = '<p class="text-slate-400 italic py-2">Bu ay için ajanda hazırlanamadı.</p>';
+                    return;
+                }
+
+                box.innerHTML = data.items.map(item => `
+                    <div class="flex items-start space-x-2">
+                        <input type="checkbox" class="mt-0.5 accent-emerald-500 rounded">
+                        <span><strong>${escapeHtml(item.baslik)}:</strong> ${escapeHtml(item.detay)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                box.innerHTML = '<p class="text-rose-300 py-2">Ajanda şu anda yüklenemedi.</p>';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', fetchMonthlyAgenda);
+
+        // ============ Bölge Ziraat Mühendisleri ============
+        async function fetchEngineers() {
+            const box = document.getElementById('engineers-list');
+            try {
+                const res = await fetch('/api/engineers');
+                if (!res.ok) throw new Error('İstek başarısız');
+                const engineers = await res.json();
+
+                if (!engineers.length) {
+                    box.innerHTML = '<p class="text-xs text-slate-400 italic py-2">Henüz kayıtlı mühendis bulunmuyor.</p>';
+                    return;
+                }
+
+                box.innerHTML = engineers.map(eng => `
+                    <div class="bg-stone-950/50 border border-emerald-900/30 rounded-xl p-2.5 text-xs space-y-1">
+                        <div class="font-bold text-emerald-300">${escapeHtml(eng.ad_soyad)}</div>
+                        ${eng.uzmanlik_alani ? `<div class="text-slate-400">${escapeHtml(eng.uzmanlik_alani)}</div>` : ''}
+                        <a href="tel:${escapeHtml(eng.telefon)}" class="flex items-center text-slate-300 hover:text-emerald-300 transition-colors">
+                            <i class="fa-solid fa-phone mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(eng.telefon)}
+                        </a>
+                        <div class="flex items-center text-slate-400">
+                            <i class="fa-solid fa-clock mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(eng.musait_saatler)}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                box.innerHTML = '<p class="text-xs text-rose-300 py-2">Liste şu anda yüklenemedi.</p>';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', fetchEngineers);
+
+        // ============ Zirai İlaç Bayileri ============
+        async function fetchDealers() {
+            const box = document.getElementById('dealers-list');
+            try {
+                const res = await fetch('/api/dealers');
+                if (!res.ok) throw new Error('İstek başarısız');
+                const dealers = await res.json();
+
+                if (!dealers.length) {
+                    box.innerHTML = '<p class="text-xs text-slate-400 italic py-2">Henüz kayıtlı bayi bulunmuyor.</p>';
+                    return;
+                }
+
+                box.innerHTML = dealers.map(d => `
+                    <div class="bg-stone-950/40 border border-emerald-950/50 rounded-xl p-2.5 text-xs space-y-1">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-emerald-300">${escapeHtml(d.bayi_adi)}</span>
+                            ${d.ruhsatli ? '<span class="text-[9px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-900/45 font-semibold whitespace-nowrap"><i class="fa-solid fa-circle-check mr-0.5"></i>Ruhsatlı Bayi</span>' : ''}
+                        </div>
+                        ${d.aciklama ? `<div class="text-slate-400">${escapeHtml(d.aciklama)}</div>` : ''}
+                        <a href="tel:${escapeHtml(d.telefon)}" class="flex items-center text-slate-300 hover:text-emerald-300 transition-colors">
+                            <i class="fa-solid fa-phone mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(d.telefon)}
+                        </a>
+                        ${d.adres ? `<div class="flex items-center text-slate-400"><i class="fa-solid fa-location-dot mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(d.adres)}</div>` : ''}
+                    </div>
+                `).join('');
+            } catch (e) {
+                box.innerHTML = '<p class="text-xs text-rose-300 py-2">Liste şu anda yüklenemedi.</p>';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', fetchDealers);
+
+        // ================= HESAP AYARLARI =================
+        const accountModal = document.getElementById('account-modal');
+        const accountCloseBtn = document.getElementById('account-close-btn');
+        const accountUsernameEl = document.getElementById('account-username');
+        const accountEmailEl = document.getElementById('account-email');
+        const accountCreatedAtEl = document.getElementById('account-created-at');
+        const accountError = document.getElementById('account-error');
+        const accountSuccess = document.getElementById('account-success');
+        const changePasswordForm = document.getElementById('change-password-form');
+        const phoneForm = document.getElementById('phone-form');
+        const phoneInput = document.getElementById('phone-input');
+        const smsOptInCheckbox = document.getElementById('sms-opt-in');
+        const phoneError = document.getElementById('phone-error');
+        const phoneSuccess = document.getElementById('phone-success');
+
+        function showPhoneError(msg) {
+            phoneSuccess.classList.add('hidden');
+            phoneError.textContent = msg;
+            phoneError.classList.remove('hidden');
+        }
+        function showPhoneSuccess(msg) {
+            phoneError.classList.add('hidden');
+            phoneSuccess.textContent = msg;
+            phoneSuccess.classList.remove('hidden');
+        }
+        function clearPhoneMessages() {
+            phoneError.classList.add('hidden');
+            phoneSuccess.classList.add('hidden');
+        }
+
+        function showAccountError(msg) {
+            accountSuccess.classList.add('hidden');
+            accountError.textContent = msg;
+            accountError.classList.remove('hidden');
+        }
+        function showAccountSuccess(msg) {
+            accountError.classList.add('hidden');
+            accountSuccess.textContent = msg;
+            accountSuccess.classList.remove('hidden');
+        }
+        function clearAccountMessages() {
+            accountError.classList.add('hidden');
+            accountSuccess.classList.add('hidden');
+        }
+        function formatMemberSince(isoLike) {
+            if (!isoLike) return '-';
+            const d = new Date(isoLike.replace(' ', 'T') + 'Z');
+            if (isNaN(d.getTime())) return isoLike;
+            return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+
+        function openAccountModal() {
+            if (!currentUser) return;
+            accountUsernameEl.textContent = currentUser.username;
+            accountEmailEl.textContent = currentUser.email;
+            accountCreatedAtEl.textContent = formatMemberSince(currentUser.created_at);
+            document.getElementById('account-plan').innerHTML = currentUser.is_premium
+                ? '<span class="text-amber-300"><i class="fa-solid fa-star mr-1"></i>Premium</span>'
+                : '<span class="text-slate-400">Ücretsiz (günde 3 soru)</span>';
+            clearAccountMessages();
+            clearPhoneMessages();
+            changePasswordForm.reset();
+            phoneInput.value = currentUser.phone || '';
+            smsOptInCheckbox.checked = !!currentUser.sms_opt_in;
+            accountModal.classList.remove('hidden');
+        }
+        function closeAccountModal() {
+            accountModal.classList.add('hidden');
+        }
+
+        accountBtn.addEventListener('click', openAccountModal);
+        accountCloseBtn.addEventListener('click', closeAccountModal);
+        accountModal.addEventListener('click', (e) => {
+            if (e.target === accountModal) closeAccountModal();
+        });
+
+        changePasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearAccountMessages();
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const newPasswordConfirm = document.getElementById('new-password-confirm').value;
+
+            if (newPassword !== newPasswordConfirm) {
+                showAccountError('Yeni şifreler birbiriyle eşleşmiyor.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/account/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showAccountSuccess('Şifreniz başarıyla güncellendi.');
+                    changePasswordForm.reset();
+                } else {
+                    showAccountError(data.detail || 'Şifre güncellenemedi.');
+                }
+            } catch (err) {
+                showAccountError('Sunucuya bağlanılamadı.');
+            }
+        });
+
+        phoneForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearPhoneMessages();
+            const phone = phoneInput.value.trim();
+            const smsOptIn = smsOptInCheckbox.checked;
+
+            try {
+                const res = await fetch('/api/account/update-phone', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone || null, sms_opt_in: smsOptIn })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    if (currentUser) {
+                        currentUser.phone = data.phone;
+                        currentUser.sms_opt_in = data.sms_opt_in;
+                    }
+                    phoneInput.value = data.phone || '';
+                    smsOptInCheckbox.checked = !!data.sms_opt_in;
+                    showPhoneSuccess('Telefon bilgileriniz kaydedildi.');
+                } else {
+                    showPhoneError(data.detail || 'Telefon bilgisi kaydedilemedi.');
+                }
+            } catch (err) {
+                showPhoneError('Sunucuya bağlanılamadı.');
+            }
+        });
     </script>
 </body>
 </html>

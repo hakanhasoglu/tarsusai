@@ -18,7 +18,7 @@ except Exception as e:
   console.print(f"[bold red]Hata: Vertex AI başlatılamadı:[/bold red] {e}")
   sys.exit(1)
 
-# Sistem komutunu (System Prompt) main.py ile senkronize ettik. 
+# Sistem komutunu (System Prompt) main.py ile senkronize ettik.
 # Böylece terminaldeki testleriniz ile web arayüzündeki cevaplar birebir aynı kalitede olacak!
 system_prompt = (
     "Sen TarsusAI bünyesinde çalışan, Çukurova ve Tarsus bölgesinde uzmanlaşmış kıdemli bir Uzman Ziraat Mühendisisin. "
@@ -44,8 +44,8 @@ console.print(Panel(
   "👉 [bold cyan]Yazı ile sohbet etmek için:[/bold cyan] Doğrudan sorunuzu yazın.\n"
   "👉 [bold magenta]Fotoğraf analizi testi için:[/bold magenta] [yellow]/resim <dosya_yolu> <sorunuz>[/yellow] şeklinde yazın.\n"
   "   [italic dim](Örn: /resim yaprak.jpg bu lekeler neden kaynaklanıyor olabilir?)[/italic dim]\n\n"
-  "❌ Çıkmak için [bold red]'exit'[/bold red] yazabilirsiniz.", 
-  title="[bold yellow]Sistem Hazır (Mühendis Modu)[/bold yellow]", 
+  "❌ Çıkmak için [bold red]'exit'[/bold red] yazabilirsiniz.",
+  title="[bold yellow]Sistem Hazır (Mühendis Modu)[/bold yellow]",
   subtitle="Model: Gemini 2.5 Flash"
 ))
 
@@ -53,11 +53,11 @@ def load_local_image(file_path: str):
     """Yerel diskteki resmi okuyup bytes ve mime type döndürür."""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Görsel belirtilen yolda bulunamadı: '{file_path}'")
-    
+
     mime_type, _ = mimetypes.guess_type(file_path)
     if not mime_type:
         mime_type = "image/jpeg" # default fallback
-        
+
     with open(file_path, "rb") as f:
         image_bytes = f.read()
     return image_bytes, mime_type
@@ -68,22 +68,22 @@ while True:
     if user_message.lower() in ["exit", "quit", "çıkış"]:
       console.print("[bold red]Terminal sohbeti sonlandırıldı.[/bold red]")
       break
-       
+
     if not user_message:
       continue
-       
+
     contents = []
-    
+
     # Gelişmiş Komut: Görsel Analiz Testi
     if user_message.startswith("/resim"):
         parts = user_message.split(maxsplit=2)
         if len(parts) < 2:
             console.print("[bold red]Hata: Lütfen bir görsel yolu belirtin! Örn: /resim yaprak.jpg[/bold red]")
             continue
-            
+
         file_path = parts[1]
         custom_question = parts[2] if len(parts) > 2 else "Lütfen bu görseldeki bitkiyi analiz edip teşhis koyun."
-        
+
         try:
             with console.status(f"[bold magenta]Görsel yükleniyor: {file_path}...[/bold magenta]"):
                 img_bytes, mime_type = load_local_image(file_path)
@@ -101,7 +101,7 @@ while True:
     else:
         # Normal Yazı Sohbeti
         contents.append(user_message)
-       
+
     # Yapay zeka düşünüyor animasyonu
     with console.status("[bold yellow]TarsusAI düşünüyor...[/bold yellow]"):
       response = client.models.generate_content(
@@ -109,11 +109,11 @@ while True:
         contents=contents,
         config=config
       )
-       
+
     # Yanıtı Markdown formatında güzel bir panel içinde göster
     console.print(Panel(
-      Markdown(response.text), 
-      title="[bold violet]Ziraat Mühendisi Tavsiyesi[/bold violet]", 
+      Markdown(response.text),
+      title="[bold violet]Ziraat Mühendisi Tavsiyesi[/bold violet]",
       border_style="violet",
       padding=(1, 2)
     ))

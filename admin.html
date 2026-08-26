@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TarsusAI - Yönetim Paneli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #022c22; }
+        ::-webkit-scrollbar-thumb { background: #064e3b; border-radius: 99px; }
+    </style>
+</head>
+<body class="bg-gradient-to-tr from-stone-950 via-emerald-950 to-green-950 text-emerald-50 min-h-screen font-sans antialiased">
+
+    <!-- Yetkisiz / Yükleniyor Ekranı -->
+    <div id="gate-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-stone-950 p-4">
+        <div id="gate-message" class="text-center text-slate-300">
+            <i class="fa-solid fa-spinner animate-spin text-2xl text-emerald-400"></i>
+            <p class="mt-3 text-sm">Yetki kontrol ediliyor...</p>
+        </div>
+    </div>
+
+    <div id="admin-content" class="hidden max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+
+        <header class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-green-500 flex items-center justify-center text-white text-xl shadow-lg">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg text-white">TarsusAI Yönetim Paneli</h1>
+                    <p class="text-xs text-emerald-400">Sadece yöneticiler görebilir</p>
+                </div>
+            </div>
+            <a href="/" class="text-xs bg-stone-900/80 border border-emerald-900/40 rounded-xl px-3 py-2 text-slate-300 hover:text-emerald-300 hover:border-emerald-500/50 transition-all">
+                <i class="fa-solid fa-arrow-left mr-1.5"></i>Uygulamaya Dön
+            </a>
+        </header>
+
+        <!-- İstatistik Kartları -->
+        <section>
+            <h2 class="text-xs font-bold tracking-wider text-emerald-400 uppercase mb-3">Genel Bakış</h2>
+            <div id="stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Toplam Kullanıcı</div>
+                    <div id="stat-total-users" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Son 7 Günde Kayıt</div>
+                    <div id="stat-signups-7d" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Bugün Aktif Kullanıcı</div>
+                    <div id="stat-active-today" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Bugünkü Mesaj</div>
+                    <div id="stat-messages-today" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Toplam Mesaj</div>
+                    <div id="stat-messages-total" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Premium Kullanıcı</div>
+                    <div id="stat-premium-users" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Kayıtlı Mühendis</div>
+                    <div id="stat-engineers" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+                <div class="stat-card bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Kayıtlı Bayi</div>
+                    <div id="stat-dealers" class="text-2xl font-black text-white mt-1">-</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Kullanıcılar / Premium Yönetimi -->
+        <section class="bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4 md:p-5">
+            <h2 class="text-xs font-bold tracking-wider text-emerald-400 uppercase mb-3">
+                <i class="fa-solid fa-users mr-1.5"></i>Kullanıcılar
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-left text-slate-400 border-b border-emerald-900/30">
+                            <th class="py-2 pr-3">Kullanıcı Adı</th>
+                            <th class="py-2 pr-3">E-posta</th>
+                            <th class="py-2 pr-3">Kayıt</th>
+                            <th class="py-2 pr-3">Rol</th>
+                            <th class="py-2 pr-3">Premium</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Mühendisler -->
+            <section class="bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4 md:p-5 space-y-4">
+                <h2 class="text-xs font-bold tracking-wider text-emerald-400 uppercase">
+                    <i class="fa-solid fa-user-tie mr-1.5"></i>Bölge Ziraat Mühendisleri
+                </h2>
+                <form id="engineer-form" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input type="text" id="eng-ad-soyad" placeholder="Ad Soyad" required class="col-span-2 bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <input type="text" id="eng-telefon" placeholder="Telefon" required class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <input type="text" id="eng-uzmanlik" placeholder="Uzmanlık Alanı (opsiyonel)" class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <input type="text" id="eng-saatler" placeholder="Müsait Saatler" required class="col-span-2 bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <button type="submit" class="col-span-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl py-2 font-semibold text-sm">
+                        <i class="fa-solid fa-plus mr-1.5"></i>Mühendis Ekle
+                    </button>
+                </form>
+                <div id="engineers-list" class="space-y-2 text-xs"></div>
+            </section>
+
+            <!-- Bayiler -->
+            <section class="bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4 md:p-5 space-y-4">
+                <h2 class="text-xs font-bold tracking-wider text-emerald-400 uppercase">
+                    <i class="fa-solid fa-shop mr-1.5"></i>Zirai İlaç Bayileri
+                </h2>
+                <form id="dealer-form" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input type="text" id="deal-bayi-adi" placeholder="Bayi Adı" required class="col-span-2 bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <input type="text" id="deal-telefon" placeholder="Telefon" required class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <input type="text" id="deal-adres" placeholder="Adres (opsiyonel)" class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <input type="text" id="deal-aciklama" placeholder="Açıklama (opsiyonel)" class="col-span-2 bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <label class="col-span-2 flex items-center space-x-2 text-xs text-slate-300 px-1">
+                        <input type="checkbox" id="deal-ruhsatli" checked class="w-4 h-4 rounded border-emerald-900 bg-stone-950 text-emerald-600">
+                        <span>Ruhsatlı Bayi</span>
+                    </label>
+                    <button type="submit" class="col-span-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl py-2 font-semibold text-sm">
+                        <i class="fa-solid fa-plus mr-1.5"></i>Bayi Ekle
+                    </button>
+                </form>
+                <div id="dealers-list" class="space-y-2 text-xs"></div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const gateScreen = document.getElementById('gate-screen');
+        const gateMessage = document.getElementById('gate-message');
+        const adminContent = document.getElementById('admin-content');
+
+        async function checkAdminAccess() {
+            try {
+                const res = await fetch('/api/me');
+                if (!res.ok) {
+                    gateMessage.innerHTML = '<i class="fa-solid fa-lock text-2xl text-rose-400"></i><p class="mt-3 text-sm">Giriş yapmalısınız. <a href="/" class="text-emerald-400 underline">Ana sayfaya dön</a></p>';
+                    return;
+                }
+                const user = await res.json();
+                if (!user.is_admin) {
+                    gateMessage.innerHTML = '<i class="fa-solid fa-ban text-2xl text-rose-400"></i><p class="mt-3 text-sm">Bu sayfayı görüntüleme yetkiniz yok. <a href="/" class="text-emerald-400 underline">Ana sayfaya dön</a></p>';
+                    return;
+                }
+                gateScreen.classList.add('hidden');
+                adminContent.classList.remove('hidden');
+                loadStats();
+                loadUsers();
+                loadEngineers();
+                loadDealers();
+            } catch (e) {
+                gateMessage.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-2xl text-rose-400"></i><p class="mt-3 text-sm">Sunucuya bağlanılamadı.</p>';
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str ?? '';
+            return div.innerHTML;
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/admin/stats');
+                const s = await res.json();
+                document.getElementById('stat-total-users').textContent = s.total_users;
+                document.getElementById('stat-signups-7d').textContent = s.signups_last_7_days;
+                document.getElementById('stat-active-today').textContent = s.active_users_today;
+                document.getElementById('stat-messages-today').textContent = s.messages_today;
+                document.getElementById('stat-messages-total').textContent = s.messages_total;
+                document.getElementById('stat-premium-users').textContent = s.premium_users;
+                document.getElementById('stat-engineers').textContent = s.engineers_count;
+                document.getElementById('stat-dealers').textContent = s.dealers_count;
+            } catch (e) {}
+        }
+
+        async function togglePremium(userId, checked) {
+            try {
+                await fetch(`/api/admin/users/${userId}/premium`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_premium: checked })
+                });
+                loadStats();
+            } catch (e) {}
+        }
+
+        async function loadUsers() {
+            const body = document.getElementById('users-table-body');
+            try {
+                const res = await fetch('/api/admin/users');
+                const users = await res.json();
+                body.innerHTML = users.map(u => `
+                    <tr class="border-b border-emerald-950/40">
+                        <td class="py-2 pr-3 font-semibold text-white">${escapeHtml(u.username)}</td>
+                        <td class="py-2 pr-3 text-slate-400">${escapeHtml(u.email)}</td>
+                        <td class="py-2 pr-3 text-slate-400">${escapeHtml((u.created_at || '').slice(0, 10))}</td>
+                        <td class="py-2 pr-3">${u.is_admin ? '<span class="text-emerald-400 font-semibold">Yönetici</span>' : '<span class="text-slate-500">Kullanıcı</span>'}</td>
+                        <td class="py-2 pr-3">
+                            <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                                <input type="checkbox" ${u.is_premium ? 'checked' : ''} onchange="togglePremium(${u.id}, this.checked)" class="w-4 h-4 rounded border-emerald-900 bg-stone-950 text-emerald-600">
+                                <span class="text-slate-300">${u.is_premium ? 'Evet' : 'Hayır'}</span>
+                            </label>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                body.innerHTML = '<tr><td colspan="5" class="py-3 text-rose-300">Liste yüklenemedi.</td></tr>';
+            }
+        }
+
+        async function loadEngineers() {
+            const box = document.getElementById('engineers-list');
+            try {
+                const res = await fetch('/api/admin/engineers');
+                const rows = await res.json();
+                if (!rows.length) {
+                    box.innerHTML = '<p class="text-slate-500 italic py-1">Henüz kayıtlı mühendis yok.</p>';
+                    return;
+                }
+                box.innerHTML = rows.map(e => `
+                    <div class="flex items-center justify-between bg-stone-950/50 border border-emerald-900/30 rounded-xl p-2.5">
+                        <div>
+                            <div class="font-semibold text-emerald-300">${escapeHtml(e.ad_soyad)}</div>
+                            <div class="text-slate-400">${escapeHtml(e.telefon)} ${e.uzmanlik_alani ? '· ' + escapeHtml(e.uzmanlik_alani) : ''}</div>
+                        </div>
+                        <button onclick="deleteEngineer(${e.id})" class="text-rose-500 hover:text-rose-400 p-1.5"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                box.innerHTML = '<p class="text-rose-300 py-1">Liste yüklenemedi.</p>';
+            }
+        }
+
+        async function deleteEngineer(id) {
+            if (!confirm('Bu mühendisi silmek istediğinize emin misiniz?')) return;
+            await fetch(`/api/admin/engineers/${id}`, { method: 'DELETE' });
+            loadEngineers();
+            loadStats();
+        }
+
+        document.getElementById('engineer-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = {
+                ad_soyad: document.getElementById('eng-ad-soyad').value.trim(),
+                telefon: document.getElementById('eng-telefon').value.trim(),
+                uzmanlik_alani: document.getElementById('eng-uzmanlik').value.trim() || null,
+                musait_saatler: document.getElementById('eng-saatler').value.trim(),
+            };
+            await fetch('/api/admin/engineers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            e.target.reset();
+            loadEngineers();
+            loadStats();
+        });
+
+        async function loadDealers() {
+            const box = document.getElementById('dealers-list');
+            try {
+                const res = await fetch('/api/admin/dealers');
+                const rows = await res.json();
+                if (!rows.length) {
+                    box.innerHTML = '<p class="text-slate-500 italic py-1">Henüz kayıtlı bayi yok.</p>';
+                    return;
+                }
+                box.innerHTML = rows.map(d => `
+                    <div class="flex items-center justify-between bg-stone-950/50 border border-emerald-900/30 rounded-xl p-2.5">
+                        <div>
+                            <div class="font-semibold text-emerald-300">${escapeHtml(d.bayi_adi)} ${d.ruhsatli ? '<span class="text-[9px] text-emerald-400">(Ruhsatlı)</span>' : ''}</div>
+                            <div class="text-slate-400">${escapeHtml(d.telefon)} ${d.adres ? '· ' + escapeHtml(d.adres) : ''}</div>
+                        </div>
+                        <button onclick="deleteDealer(${d.id})" class="text-rose-500 hover:text-rose-400 p-1.5"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                box.innerHTML = '<p class="text-rose-300 py-1">Liste yüklenemedi.</p>';
+            }
+        }
+
+        async function deleteDealer(id) {
+            if (!confirm('Bu bayiyi silmek istediğinize emin misiniz?')) return;
+            await fetch(`/api/admin/dealers/${id}`, { method: 'DELETE' });
+            loadDealers();
+            loadStats();
+        }
+
+        document.getElementById('dealer-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = {
+                bayi_adi: document.getElementById('deal-bayi-adi').value.trim(),
+                telefon: document.getElementById('deal-telefon').value.trim(),
+                adres: document.getElementById('deal-adres').value.trim() || null,
+                aciklama: document.getElementById('deal-aciklama').value.trim() || null,
+                ruhsatli: document.getElementById('deal-ruhsatli').checked,
+            };
+            await fetch('/api/admin/dealers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            e.target.reset();
+            document.getElementById('deal-ruhsatli').checked = true;
+            loadDealers();
+            loadStats();
+        });
+
+        checkAdminAccess();
+    </script>
+</body>
+</html>

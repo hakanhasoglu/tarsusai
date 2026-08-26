@@ -5,3 +5,5 @@ __pycache__/
 *.json
 credentials*
 service-account*
+tarsus_users.db
+.session_secret
