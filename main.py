@@ -205,6 +205,16 @@ def init_db():
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets (token_hash)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_user_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            target TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_log_time ON admin_audit_log (created_at)")
     conn.commit()
     conn.close()
 
@@ -582,6 +592,14 @@ def require_admin(req: Request) -> int:
     return req.session["user_id"]
 
 
+def log_admin_action(conn: sqlite3.Connection, admin_user_id: int, action: str, target: Optional[str] = None):
+    """Yönetici işlemlerini iz kaydına ekler. Çağıranın kendi commit()'iyle birlikte kalıcı olur."""
+    conn.execute(
+        "INSERT INTO admin_audit_log (admin_user_id, action, target) VALUES (?, ?, ?)",
+        (admin_user_id, action, target),
+    )
+
+
 class EngineerIn(BaseModel):
     ad_soyad: str
     telefon: str
@@ -655,14 +673,33 @@ async def admin_list_users(req: Request):
 
 @app.post("/api/admin/users/{user_id}/premium")
 async def admin_set_premium(user_id: int, request: PremiumToggleRequest, req: Request):
-    require_admin(req)
+    admin_id = require_admin(req)
     conn = get_db()
     try:
         conn.execute("UPDATE users SET is_premium = ? WHERE id = ?", (int(request.is_premium), user_id))
+        log_admin_action(conn, admin_id, "premium_" + ("on" if request.is_premium else "off"), target=f"user_id={user_id}")
         conn.commit()
     finally:
         conn.close()
     return {"ok": True}
+
+
+@app.get("/api/admin/audit-log")
+async def admin_audit_log(req: Request):
+    require_admin(req)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT admin_audit_log.id, admin_audit_log.action, admin_audit_log.target,
+                   admin_audit_log.created_at, users.username AS admin_username
+            FROM admin_audit_log
+            LEFT JOIN users ON users.id = admin_audit_log.admin_user_id
+            ORDER BY admin_audit_log.id DESC
+            LIMIT 100
+        """).fetchall()
+    finally:
+        conn.close()
+    return [dict(row) for row in rows]
 
 
 @app.get("/api/admin/engineers")
@@ -678,13 +715,14 @@ async def admin_list_engineers(req: Request):
 
 @app.post("/api/admin/engineers")
 async def admin_add_engineer(engineer: EngineerIn, req: Request):
-    require_admin(req)
+    admin_id = require_admin(req)
     conn = get_db()
     try:
         conn.execute(
             "INSERT INTO engineers (ad_soyad, telefon, uzmanlik_alani, musait_saatler) VALUES (?, ?, ?, ?)",
             (engineer.ad_soyad.strip(), engineer.telefon.strip(), (engineer.uzmanlik_alani or "").strip() or None, engineer.musait_saatler.strip()),
         )
+        log_admin_action(conn, admin_id, "engineer_add", target=engineer.ad_soyad.strip())
         conn.commit()
     finally:
         conn.close()
@@ -693,10 +731,11 @@ async def admin_add_engineer(engineer: EngineerIn, req: Request):
 
 @app.delete("/api/admin/engineers/{engineer_id}")
 async def admin_delete_engineer(engineer_id: int, req: Request):
-    require_admin(req)
+    admin_id = require_admin(req)
     conn = get_db()
     try:
         conn.execute("DELETE FROM engineers WHERE id = ?", (engineer_id,))
+        log_admin_action(conn, admin_id, "engineer_delete", target=f"engineer_id={engineer_id}")
         conn.commit()
     finally:
         conn.close()
@@ -716,7 +755,7 @@ async def admin_list_dealers(req: Request):
 
 @app.post("/api/admin/dealers")
 async def admin_add_dealer(dealer: DealerIn, req: Request):
-    require_admin(req)
+    admin_id = require_admin(req)
     conn = get_db()
     try:
         conn.execute(
@@ -724,6 +763,7 @@ async def admin_add_dealer(dealer: DealerIn, req: Request):
             (dealer.bayi_adi.strip(), dealer.telefon.strip(), (dealer.adres or "").strip() or None,
              (dealer.aciklama or "").strip() or None, int(dealer.ruhsatli)),
         )
+        log_admin_action(conn, admin_id, "dealer_add", target=dealer.bayi_adi.strip())
         conn.commit()
     finally:
         conn.close()
@@ -732,10 +772,11 @@ async def admin_add_dealer(dealer: DealerIn, req: Request):
 
 @app.delete("/api/admin/dealers/{dealer_id}")
 async def admin_delete_dealer(dealer_id: int, req: Request):
-    require_admin(req)
+    admin_id = require_admin(req)
     conn = get_db()
     try:
         conn.execute("DELETE FROM dealers WHERE id = ?", (dealer_id,))
+        log_admin_action(conn, admin_id, "dealer_delete", target=f"dealer_id={dealer_id}")
         conn.commit()
     finally:
         conn.close()
@@ -1007,6 +1048,23 @@ def parse_base64_image(base64_str: str):
 @app.get("/")
 async def get_index():
     return FileResponse("index.html")
+
+
+@app.get("/api/health")
+async def health_check():
+    """Uptime izleme servisleri için hafif kontrol noktası. Kimlik doğrulama gerektirmez."""
+    try:
+        conn = get_db()
+        conn.execute("SELECT 1")
+        conn.close()
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+
+    ai_status = "ok" if client is not None else "error"
+    overall_status = "ok" if db_status == "ok" and ai_status == "ok" else "degraded"
+
+    return {"status": overall_status, "database": db_status, "vertex_ai": ai_status}
 
 
 @app.get("/api/engineers")

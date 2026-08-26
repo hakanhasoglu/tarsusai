@@ -138,6 +138,26 @@
                 <div id="dealers-list" class="space-y-2 text-xs"></div>
             </section>
         </div>
+
+        <!-- Yönetici İşlem Kaydı -->
+        <section class="bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4 md:p-5">
+            <h2 class="text-xs font-bold tracking-wider text-emerald-400 uppercase mb-3">
+                <i class="fa-solid fa-clock-rotate-left mr-1.5"></i>Yönetici İşlem Kaydı
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-left text-slate-400 border-b border-emerald-900/30">
+                            <th class="py-2 pr-3">Tarih</th>
+                            <th class="py-2 pr-3">Yönetici</th>
+                            <th class="py-2 pr-3">İşlem</th>
+                            <th class="py-2 pr-3">Hedef</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-log-table-body"></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script>
@@ -163,6 +183,7 @@
                 loadUsers();
                 loadEngineers();
                 loadDealers();
+                loadAuditLog();
             } catch (e) {
                 gateMessage.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-2xl text-rose-400"></i><p class="mt-3 text-sm">Sunucuya bağlanılamadı.</p>';
             }
@@ -197,7 +218,39 @@
                     body: JSON.stringify({ is_premium: checked })
                 });
                 loadStats();
+                loadAuditLog();
             } catch (e) {}
+        }
+
+        const AUDIT_ACTION_LABELS = {
+            premium_on: 'Premium açıldı',
+            premium_off: 'Premium kapatıldı',
+            engineer_add: 'Mühendis eklendi',
+            engineer_delete: 'Mühendis silindi',
+            dealer_add: 'Bayi eklendi',
+            dealer_delete: 'Bayi silindi',
+        };
+
+        async function loadAuditLog() {
+            const body = document.getElementById('audit-log-table-body');
+            try {
+                const res = await fetch('/api/admin/audit-log');
+                const rows = await res.json();
+                if (!rows.length) {
+                    body.innerHTML = '<tr><td colspan="4" class="py-3 text-slate-500 italic">Henüz kayıt yok.</td></tr>';
+                    return;
+                }
+                body.innerHTML = rows.map(r => `
+                    <tr class="border-b border-emerald-950/40">
+                        <td class="py-2 pr-3 text-slate-400 whitespace-nowrap">${escapeHtml((r.created_at || '').replace('T', ' ').slice(0, 19))}</td>
+                        <td class="py-2 pr-3 font-semibold text-white">${escapeHtml(r.admin_username || '-')}</td>
+                        <td class="py-2 pr-3 text-emerald-300">${escapeHtml(AUDIT_ACTION_LABELS[r.action] || r.action)}</td>
+                        <td class="py-2 pr-3 text-slate-400">${escapeHtml(r.target || '-')}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                body.innerHTML = '<tr><td colspan="4" class="py-3 text-rose-300">Kayıtlar yüklenemedi.</td></tr>';
+            }
         }
 
         async function loadUsers() {
@@ -252,6 +305,7 @@
             await fetch(`/api/admin/engineers/${id}`, { method: 'DELETE' });
             loadEngineers();
             loadStats();
+            loadAuditLog();
         }
 
         document.getElementById('engineer-form').addEventListener('submit', async (e) => {
@@ -270,6 +324,7 @@
             e.target.reset();
             loadEngineers();
             loadStats();
+            loadAuditLog();
         });
 
         async function loadDealers() {
@@ -300,6 +355,7 @@
             await fetch(`/api/admin/dealers/${id}`, { method: 'DELETE' });
             loadDealers();
             loadStats();
+            loadAuditLog();
         }
 
         document.getElementById('dealer-form').addEventListener('submit', async (e) => {
@@ -320,6 +376,7 @@
             document.getElementById('deal-ruhsatli').checked = true;
             loadDealers();
             loadStats();
+            loadAuditLog();
         });
 
         checkAdminAccess();
