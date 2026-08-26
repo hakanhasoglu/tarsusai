@@ -11,6 +11,7 @@ from email.mime.text import MIMEText
 from datetime import date, datetime, timedelta
 from typing import Optional
 import bcrypt
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,6 +67,10 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://tarsus.world")
+
+NETGSM_USERCODE = os.environ.get("NETGSM_USERCODE")
+NETGSM_PASSWORD = os.environ.get("NETGSM_PASSWORD")
+NETGSM_HEADER = os.environ.get("NETGSM_HEADER")
 
 
 def get_client_ip(req: Request) -> str:
@@ -285,6 +290,42 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
     except Exception as e:
         console.print(f"[bold red]❌ E-posta gönderilemedi ({to_email}):[/bold red] {e}")
         return False
+
+
+def to_netgsm_phone(phone: str) -> str:
+    """Netgsm'in beklediği 10 haneli formata çevirir (başında 0 veya +90 olmadan, örn. 5551234567)."""
+    digits = re.sub(r"\D", "", phone)
+    if digits.startswith("90") and len(digits) == 12:
+        digits = digits[2:]
+    elif digits.startswith("0") and len(digits) == 11:
+        digits = digits[1:]
+    return digits
+
+
+def send_sms_bulk(phone_numbers: list, message: str) -> tuple:
+    """Netgsm üzerinden verilen numaralara aynı mesajı gönderir. (başarılı_mı, netgsm_ham_yanıtı) döner."""
+    if not NETGSM_USERCODE or not NETGSM_PASSWORD or not NETGSM_HEADER:
+        return False, "Netgsm ayarları (.env) eksik."
+    if not phone_numbers:
+        return False, "Gönderilecek numara yok."
+    try:
+        resp = httpx.get(
+            "https://api.netgsm.com.tr/sms/send/get",
+            params={
+                "usercode": NETGSM_USERCODE,
+                "password": NETGSM_PASSWORD,
+                "gsmno": ",".join(phone_numbers),
+                "message": message,
+                "msgheader": NETGSM_HEADER,
+                "dil": "TR",
+            },
+            timeout=15,
+        )
+        result = resp.text.strip()
+        ok = bool(result) and result.split()[0] in ("00", "01")
+        return ok, result
+    except Exception as e:
+        return False, str(e)
 
 
 class RegisterRequest(BaseModel):
@@ -700,6 +741,55 @@ async def admin_audit_log(req: Request):
     finally:
         conn.close()
     return [dict(row) for row in rows]
+
+
+class EmergencySmsRequest(BaseModel):
+    message: str
+
+
+@app.get("/api/admin/sms-recipients-count")
+async def admin_sms_recipients_count(req: Request):
+    require_admin(req)
+    conn = get_db()
+    try:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE sms_opt_in = 1 AND phone IS NOT NULL AND phone != ''"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    return {"count": count}
+
+
+@app.post("/api/admin/emergency-sms")
+async def admin_send_emergency_sms(request: EmergencySmsRequest, req: Request):
+    admin_id = require_admin(req)
+    message = request.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Mesaj boş olamaz.")
+    if len(message) > 640:
+        raise HTTPException(status_code=400, detail="Mesaj çok uzun (en fazla 640 karakter).")
+
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT phone FROM users WHERE sms_opt_in = 1 AND phone IS NOT NULL AND phone != ''"
+        ).fetchall()
+        phones = [to_netgsm_phone(row["phone"]) for row in rows]
+        phones = [p for p in phones if len(p) == 10]
+
+        if not phones:
+            raise HTTPException(status_code=400, detail="SMS almayı kabul eden kayıtlı kullanıcı yok.")
+
+        ok, result = send_sms_bulk(phones, message)
+        if not ok:
+            raise HTTPException(status_code=502, detail=f"Netgsm gönderim hatası: {result}")
+
+        log_admin_action(conn, admin_id, "emergency_sms", target=f"{len(phones)} kişi — {message[:80]}")
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"ok": True, "recipient_count": len(phones), "netgsm_result": result}
 
 
 @app.get("/api/admin/engineers")

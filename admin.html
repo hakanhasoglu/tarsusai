@@ -139,6 +139,28 @@
             </section>
         </div>
 
+        <!-- Acil Durum SMS -->
+        <section class="bg-stone-900/90 border border-amber-700/40 rounded-2xl p-4 md:p-5 space-y-3">
+            <h2 class="text-xs font-bold tracking-wider text-amber-400 uppercase">
+                <i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Acil Durum SMS Gönder
+            </h2>
+            <p class="text-xs text-slate-400">
+                Bölgesel hastalık/hava durumu uyarısı almayı kabul eden
+                (<span id="sms-recipient-count" class="text-amber-300 font-semibold">-</span> kişi) tüm kullanıcılara
+                Netgsm üzerinden tek seferde SMS gönderir. Geri alınamaz, dikkatli kullan.
+            </p>
+            <textarea id="emergency-sms-message" rows="3" maxlength="640" placeholder="Örn: Bölgemizde şiddetli dolu bekleniyor, hassas bitkilerinizi örtün."
+                class="w-full bg-stone-950/80 border border-amber-900/40 rounded-xl px-3 py-2 text-sm"></textarea>
+            <div class="flex items-center justify-between">
+                <span id="emergency-sms-charcount" class="text-[10px] text-slate-500">0 karakter</span>
+                <button id="emergency-sms-send-btn" onclick="sendEmergencySms()"
+                    class="bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl px-4 py-2 font-semibold text-sm">
+                    <i class="fa-solid fa-paper-plane mr-1.5"></i>Gönder
+                </button>
+            </div>
+            <p id="emergency-sms-result" class="text-xs"></p>
+        </section>
+
         <!-- Yönetici İşlem Kaydı -->
         <section class="bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4 md:p-5">
             <h2 class="text-xs font-bold tracking-wider text-emerald-400 uppercase mb-3">
@@ -184,6 +206,7 @@
                 loadEngineers();
                 loadDealers();
                 loadAuditLog();
+                loadSmsRecipientCount();
             } catch (e) {
                 gateMessage.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-2xl text-rose-400"></i><p class="mt-3 text-sm">Sunucuya bağlanılamadı.</p>';
             }
@@ -229,6 +252,7 @@
             engineer_delete: 'Mühendis silindi',
             dealer_add: 'Bayi eklendi',
             dealer_delete: 'Bayi silindi',
+            emergency_sms: 'Acil durum SMS gönderildi',
         };
 
         async function loadAuditLog() {
@@ -250,6 +274,58 @@
                 `).join('');
             } catch (e) {
                 body.innerHTML = '<tr><td colspan="4" class="py-3 text-rose-300">Kayıtlar yüklenemedi.</td></tr>';
+            }
+        }
+
+        async function loadSmsRecipientCount() {
+            try {
+                const res = await fetch('/api/admin/sms-recipients-count');
+                const data = await res.json();
+                document.getElementById('sms-recipient-count').textContent = data.count;
+            } catch (e) {
+                document.getElementById('sms-recipient-count').textContent = '?';
+            }
+        }
+
+        document.getElementById('emergency-sms-message').addEventListener('input', (e) => {
+            document.getElementById('emergency-sms-charcount').textContent = `${e.target.value.length} karakter`;
+        });
+
+        async function sendEmergencySms() {
+            const textarea = document.getElementById('emergency-sms-message');
+            const message = textarea.value.trim();
+            const resultEl = document.getElementById('emergency-sms-result');
+            const btn = document.getElementById('emergency-sms-send-btn');
+            const count = document.getElementById('sms-recipient-count').textContent;
+
+            if (!message) {
+                resultEl.textContent = 'Mesaj boş olamaz.';
+                resultEl.className = 'text-xs text-rose-300';
+                return;
+            }
+            if (!confirm(`${count} kişiye şu mesaj gönderilecek:\n\n"${message}"\n\nOnaylıyor musun?`)) return;
+
+            btn.disabled = true;
+            resultEl.textContent = 'Gönderiliyor...';
+            resultEl.className = 'text-xs text-slate-400';
+            try {
+                const res = await fetch('/api/admin/emergency-sms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Bilinmeyen hata');
+                resultEl.textContent = `✔ ${data.recipient_count} kişiye gönderildi.`;
+                resultEl.className = 'text-xs text-emerald-400';
+                textarea.value = '';
+                document.getElementById('emergency-sms-charcount').textContent = '0 karakter';
+                loadAuditLog();
+            } catch (e) {
+                resultEl.textContent = `Hata: ${e.message}`;
+                resultEl.className = 'text-xs text-rose-300';
+            } finally {
+                btn.disabled = false;
             }
         }
 
