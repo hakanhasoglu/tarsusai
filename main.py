@@ -5,9 +5,13 @@ import io
 import json
 import sqlite3
 import secrets
+import hashlib
+import smtplib
+from email.mime.text import MIMEText
 from datetime import date, datetime, timedelta
 from typing import Optional
 import bcrypt
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -15,6 +19,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
+
+load_dotenv()
 
 # Görsel doğrulama için Pillow kütüphanesi
 try:
@@ -32,7 +38,7 @@ app = FastAPI(title="TarsusAI - Akıllı Tarım Asistanı")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://tarsus.world", "https://www.tarsus.world"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,13 +55,24 @@ PHONE_RE = re.compile(r"^(\+90|0)?5\d{9}$")
 FREE_DAILY_CHAT_LIMIT = 3
 LOGIN_RATE_LIMIT = (10, 15 * 60)      # 15 dakikada en fazla 10 deneme
 REGISTER_RATE_LIMIT = (5, 60 * 60)    # 60 dakikada en fazla 5 deneme
+FORGOT_PASSWORD_RATE_LIMIT = (5, 60 * 60)  # 60 dakikada en fazla 5 deneme
+PASSWORD_RESET_TOKEN_TTL_MINUTES = 60
+
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://tarsus.world")
 
 
 def get_client_ip(req: Request) -> str:
-    """nginx arkasında çalıştığımız için gerçek istemci IP'sini X-Forwarded-For'dan okuruz."""
-    forwarded = req.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """nginx arkasında çalışıyoruz; uygulama sadece 127.0.0.1 üzerinden nginx'ten erişilebilir
+    olduğu için X-Real-IP header'ı nginx tarafından her istekte $remote_addr ile üzerine
+    yazılır ve istemci tarafından sahtelenemez. (X-Forwarded-For'un aksine — o header'ın ilk
+    değeri istemci tarafından serbestçe ayarlanabildiği için rate-limit bypass'ına açıktı.)"""
+    real_ip = req.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
     return req.client.host if req.client else "unknown"
 
 
@@ -78,7 +95,7 @@ app.add_middleware(
     session_cookie="tarsusai_session",
     max_age=14 * 24 * 3600,
     same_site="lax",
-    https_only=False,
+    https_only=True,
 )
 
 
@@ -160,6 +177,17 @@ def init_db():
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_rate_limit_lookup ON rate_limit_log (ip, action, attempted_at)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            expires_at TEXT NOT NULL,
+            used_at TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets (token_hash)")
     conn.commit()
     conn.close()
 
@@ -207,6 +235,31 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def send_email(to_email: str, subject: str, html_body: str) -> bool:
+    """Gmail SMTP üzerinden e-posta gönderir. SMTP_USER/SMTP_PASSWORD (App Password)
+    ortam değişkenleri ayarlı değilse gönderim atlanır, sadece terminale loglanır."""
+    if not SMTP_USER or not SMTP_PASSWORD:
+        console.print(f"[bold yellow]⚠ SMTP ayarlı değil, e-posta gönderilemedi (alıcı: {to_email}).[/bold yellow]")
+        return False
+    try:
+        msg = MIMEText(html_body, "html", "utf-8")
+        msg["Subject"] = subject
+        msg["From"] = f"TarsusAI <{SMTP_USER}>"
+        msg["To"] = to_email
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        return True
+    except Exception as e:
+        console.print(f"[bold red]❌ E-posta gönderilemedi ({to_email}):[/bold red] {e}")
+        return False
+
+
 class RegisterRequest(BaseModel):
     email: str
     username: str
@@ -237,6 +290,15 @@ class LoginRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
+    new_password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
     new_password: str
 
 
@@ -328,6 +390,95 @@ async def login(request: LoginRequest, req: Request):
 
 @app.post("/api/logout")
 async def logout(req: Request):
+    req.session.clear()
+    return {"ok": True}
+
+
+@app.post("/api/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, req: Request):
+    email = request.email.strip().lower()
+    generic_response = {
+        "ok": True,
+        "message": "Bu e-posta adresi kayıtlıysa, şifre sıfırlama linki gönderildi.",
+    }
+
+    conn = get_db()
+    try:
+        enforce_rate_limit(conn, get_client_ip(req), "forgot_password", *FORGOT_PASSWORD_RATE_LIMIT)
+
+        if not EMAIL_RE.match(email):
+            return generic_response
+
+        user = conn.execute("SELECT id, email FROM users WHERE email = ?", (email,)).fetchone()
+        if not user:
+            # Kayıtlı olmayan e-postalar için de aynı cevabı döndürürüz;
+            # böylece bu uç nokta hangi e-postaların kayıtlı olduğunu ifşa edemez.
+            return generic_response
+
+        # Süresi geçmiş eski token'ları temizle
+        conn.execute("DELETE FROM password_resets WHERE expires_at < datetime('now')")
+
+        token = secrets.token_urlsafe(32)
+        expires_at = (datetime.utcnow() + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)).isoformat(timespec="seconds")
+        conn.execute(
+            "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+            (user["id"], hash_token(token), expires_at),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    reset_link = f"{SITE_BASE_URL}/?reset_token={token}"
+    send_email(
+        user["email"],
+        "TarsusAI - Şifre Sıfırlama",
+        f"""
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #059669;">Şifre Sıfırlama Talebi</h2>
+            <p>TarsusAI hesabınız için bir şifre sıfırlama talebi aldık. Aşağıdaki bağlantıya
+            tıklayarak yeni bir şifre belirleyebilirsiniz. Bu bağlantı {PASSWORD_RESET_TOKEN_TTL_MINUTES}
+            dakika süreyle geçerlidir.</p>
+            <p style="margin: 24px 0;">
+                <a href="{reset_link}" style="background: #059669; color: white; padding: 12px 20px;
+                border-radius: 8px; text-decoration: none; font-weight: 600;">Şifremi Sıfırla</a>
+            </p>
+            <p style="color: #6b7280; font-size: 13px;">Bu talebi siz oluşturmadıysanız bu e-postayı
+            görmezden gelebilirsiniz, hesabınızda herhangi bir değişiklik yapılmayacaktır.</p>
+        </div>
+        """,
+    )
+
+    return generic_response
+
+
+@app.post("/api/reset-password")
+async def reset_password(request: ResetPasswordRequest, req: Request):
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Yeni şifre en az 6 karakter olmalı.")
+
+    token_hash = hash_token(request.token)
+
+    conn = get_db()
+    try:
+        reset_row = conn.execute(
+            "SELECT * FROM password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at >= datetime('now')",
+            (token_hash,),
+        ).fetchone()
+        if not reset_row:
+            raise HTTPException(status_code=400, detail="Bu bağlantı geçersiz veya süresi dolmuş. Lütfen yeni bir sıfırlama talebi oluşturun.")
+
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(request.new_password), reset_row["user_id"]),
+        )
+        conn.execute(
+            "UPDATE password_resets SET used_at = datetime('now') WHERE id = ?",
+            (reset_row["id"],),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
     req.session.clear()
     return {"ok": True}
 

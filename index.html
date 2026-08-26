@@ -75,12 +75,13 @@
                 <p class="text-xs text-emerald-400">Devam etmek için giriş yapın veya üye olun</p>
             </div>
 
-            <div class="flex bg-stone-950/70 rounded-xl p-1 border border-emerald-900/30 text-sm font-semibold">
+            <div id="auth-tabs" class="flex bg-stone-950/70 rounded-xl p-1 border border-emerald-900/30 text-sm font-semibold">
                 <button type="button" id="tab-login" class="flex-1 py-2 rounded-lg bg-emerald-600 text-white transition-all">Giriş Yap</button>
                 <button type="button" id="tab-register" class="flex-1 py-2 rounded-lg text-emerald-300 transition-all">Üye Ol</button>
             </div>
 
             <p id="auth-error" class="hidden text-xs text-rose-300 bg-rose-950/40 border border-rose-900/50 rounded-lg px-3 py-2"></p>
+            <p id="auth-info" class="hidden text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-900/50 rounded-lg px-3 py-2"></p>
 
             <form id="login-form" class="space-y-3">
                 <input type="text" id="login-identifier" placeholder="E-posta veya kullanıcı adı" required autocomplete="username"
@@ -88,6 +89,24 @@
                 <input type="password" id="login-password" placeholder="Şifre" required autocomplete="current-password"
                     class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
                 <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-3 font-semibold transition-all shadow-lg shadow-emerald-600/30">Giriş Yap</button>
+                <button type="button" id="forgot-password-link" class="w-full text-center text-xs text-emerald-400 hover:text-emerald-300 pt-1">Şifremi unuttum</button>
+            </form>
+
+            <form id="forgot-password-form" class="space-y-3 hidden">
+                <p class="text-xs text-slate-400 px-1">Kayıtlı e-posta adresini gir, şifre sıfırlama bağlantısını gönderelim.</p>
+                <input type="email" id="forgot-email" placeholder="E-posta" required autocomplete="email"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-3 font-semibold transition-all shadow-lg shadow-emerald-600/30">Sıfırlama Bağlantısı Gönder</button>
+                <button type="button" id="forgot-back-link" class="w-full text-center text-xs text-emerald-400 hover:text-emerald-300 pt-1">Girişe dön</button>
+            </form>
+
+            <form id="reset-password-form" class="space-y-3 hidden">
+                <p class="text-xs text-slate-400 px-1">Hesabın için yeni bir şifre belirle.</p>
+                <input type="password" id="reset-new-password" placeholder="Yeni şifre (en az 6 karakter)" required autocomplete="new-password" minlength="6"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <input type="password" id="reset-new-password-confirm" placeholder="Yeni şifre (tekrar)" required autocomplete="new-password" minlength="6"
+                    class="w-full bg-stone-950/80 border border-emerald-950 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl py-3 font-semibold transition-all shadow-lg shadow-emerald-600/30">Şifreyi Güncelle</button>
             </form>
 
             <form id="register-form" class="space-y-3 hidden">
@@ -513,11 +532,15 @@
         // ================= ÜYELİK / GİRİŞ SİSTEMİ =================
         const authOverlay = document.getElementById('auth-overlay');
         const appContent = document.getElementById('app-content');
+        const authTabsBar = document.getElementById('auth-tabs');
         const tabLogin = document.getElementById('tab-login');
         const tabRegister = document.getElementById('tab-register');
         const loginForm = document.getElementById('login-form');
         const registerForm = document.getElementById('register-form');
+        const forgotPasswordForm = document.getElementById('forgot-password-form');
+        const resetPasswordForm = document.getElementById('reset-password-form');
         const authError = document.getElementById('auth-error');
+        const authInfo = document.getElementById('auth-info');
         const userBadgeName = document.getElementById('user-badge-name');
         const accountBtn = document.getElementById('account-btn');
         const logoutBtn = document.getElementById('logout-btn');
@@ -528,6 +551,7 @@
         });
 
         function showAuthError(msg) {
+            authInfo.classList.add('hidden');
             authError.textContent = msg;
             authError.classList.remove('hidden');
         }
@@ -535,20 +559,97 @@
             authError.classList.add('hidden');
             authError.textContent = '';
         }
-        function switchAuthTab(tab) {
+        function showAuthInfo(msg) {
+            authError.classList.add('hidden');
+            authInfo.textContent = msg;
+            authInfo.classList.remove('hidden');
+        }
+        function clearAuthInfo() {
+            authInfo.classList.add('hidden');
+            authInfo.textContent = '';
+        }
+        // view: 'login' | 'register' | 'forgot' | 'reset'
+        function switchAuthTab(view) {
             clearAuthError();
-            const isLogin = tab === 'login';
-            loginForm.classList.toggle('hidden', !isLogin);
-            registerForm.classList.toggle('hidden', isLogin);
-            tabLogin.classList.toggle('bg-emerald-600', isLogin);
-            tabLogin.classList.toggle('text-white', isLogin);
-            tabLogin.classList.toggle('text-emerald-300', !isLogin);
-            tabRegister.classList.toggle('bg-emerald-600', !isLogin);
-            tabRegister.classList.toggle('text-white', !isLogin);
-            tabRegister.classList.toggle('text-emerald-300', isLogin);
+            clearAuthInfo();
+            loginForm.classList.toggle('hidden', view !== 'login');
+            registerForm.classList.toggle('hidden', view !== 'register');
+            forgotPasswordForm.classList.toggle('hidden', view !== 'forgot');
+            resetPasswordForm.classList.toggle('hidden', view !== 'reset');
+
+            const showTabs = view === 'login' || view === 'register';
+            authTabsBar.classList.toggle('hidden', !showTabs);
+            if (showTabs) {
+                const isLogin = view === 'login';
+                tabLogin.classList.toggle('bg-emerald-600', isLogin);
+                tabLogin.classList.toggle('text-white', isLogin);
+                tabLogin.classList.toggle('text-emerald-300', !isLogin);
+                tabRegister.classList.toggle('bg-emerald-600', !isLogin);
+                tabRegister.classList.toggle('text-white', !isLogin);
+                tabRegister.classList.toggle('text-emerald-300', isLogin);
+            }
         }
         tabLogin.addEventListener('click', () => switchAuthTab('login'));
         tabRegister.addEventListener('click', () => switchAuthTab('register'));
+        document.getElementById('forgot-password-link').addEventListener('click', () => switchAuthTab('forgot'));
+        document.getElementById('forgot-back-link').addEventListener('click', () => switchAuthTab('login'));
+
+        forgotPasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearAuthError();
+            clearAuthInfo();
+            const email = document.getElementById('forgot-email').value.trim();
+            try {
+                const res = await fetch('/api/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    forgotPasswordForm.reset();
+                    showAuthInfo(data.message || 'Bu e-posta adresi kayıtlıysa, şifre sıfırlama linki gönderildi.');
+                } else {
+                    showAuthError(data.detail || 'Bir hata oluştu.');
+                }
+            } catch (err) {
+                showAuthError('Sunucuya bağlanılamadı.');
+            }
+        });
+
+        let pendingResetToken = null;
+
+        resetPasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearAuthError();
+            clearAuthInfo();
+            const newPassword = document.getElementById('reset-new-password').value;
+            const confirmPassword = document.getElementById('reset-new-password-confirm').value;
+            if (newPassword !== confirmPassword) {
+                showAuthError('Şifreler eşleşmiyor.');
+                return;
+            }
+            try {
+                const res = await fetch('/api/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: pendingResetToken, new_password: newPassword }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('reset_token');
+                    window.history.replaceState({}, '', url);
+                    resetPasswordForm.reset();
+                    switchAuthTab('login');
+                    showAuthInfo('Şifren güncellendi. Şimdi yeni şifrenle giriş yapabilirsin.');
+                } else {
+                    showAuthError(data.detail || 'Şifre güncellenemedi.');
+                }
+            } catch (err) {
+                showAuthError('Sunucuya bağlanılamadı.');
+            }
+        });
 
         // ================= KVKK AYDINLATMA METNİ MODALI =================
         const kvkkModal = document.getElementById('kvkk-modal');
@@ -588,10 +689,25 @@
         // Ziyaretçi giriş yapmamış olsa bile sohbet ekranı direkt açılır;
         // giriş/üyelik ekranı yalnızca bir mesaj göndermeye çalıştığında istenir.
         async function checkAuth() {
+            // E-postadaki sıfırlama linkinden geldiyse (?reset_token=...), oturum durumundan
+            // bağımsız olarak doğrudan "yeni şifre belirle" ekranını göster.
+            const resetToken = new URL(window.location.href).searchParams.get('reset_token');
+            if (resetToken) {
+                pendingResetToken = resetToken;
+                switchAuthTab('reset');
+                showAuthScreen();
+            }
+
             try {
                 const res = await fetch('/api/me');
                 if (res.ok) {
                     onAuthSuccess(await res.json());
+                    if (resetToken) {
+                        // Girişliyken de sıfırlama linkine gelmiş olabilir; yine de şifre
+                        // değiştirme ekranını göstermeye devam ediyoruz.
+                        switchAuthTab('reset');
+                        showAuthScreen();
+                    }
                 }
             } catch (e) {
                 // Anonim gezinmeye devam — sessiz geç.
