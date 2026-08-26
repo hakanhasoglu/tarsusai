@@ -6,4 +6,5 @@ __pycache__/
 credentials*
 service-account*
 tarsus_users.db
+tarsus_users.db-*
 .session_secret

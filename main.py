@@ -104,6 +104,10 @@ app.add_middleware(
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
+    # WAL: yazma işlemleri okuma işlemlerini kilitlemez — 4 gunicorn worker'ı aynı
+    # SQLite dosyasına eşzamanlı erişirken "database is locked" hatasını önler.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
