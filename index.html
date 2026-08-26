@@ -393,6 +393,21 @@
         <!-- Sağ Panel: Hal Fiyatları ve Aylık Tarım Ajandası -->
         <aside class="hidden lg:flex flex-col w-72 shrink-0 space-y-4 overflow-y-auto">
 
+            <!-- Toprak Analiz Laboratuvarları -->
+            <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl">
+                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                    <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
+                        <i class="fa-solid fa-flask-vial mr-2"></i> Toprak Analiz Laboratuvarları
+                    </span>
+                </div>
+                <div id="soillabs-list" class="space-y-3">
+                    <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
+                        <i class="fa-solid fa-spinner animate-spin"></i>
+                        <span>Yükleniyor...</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Canlı Hal Borsa Fiyatları -->
             <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl shadow-emerald-950/10">
                 <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
@@ -1214,6 +1229,44 @@
         }
 
         window.addEventListener('DOMContentLoaded', fetchDealers);
+
+        // ============ Toprak Analiz Laboratuvarları ============
+        async function fetchSoilLabs() {
+            const box = document.getElementById('soillabs-list');
+            const bolgeSirasi = ['Tarsus', 'Mersin', 'Adana'];
+            try {
+                const res = await fetch('/api/soil-labs');
+                if (!res.ok) throw new Error('İstek başarısız');
+                const labs = await res.json();
+
+                if (!labs.length) {
+                    box.innerHTML = '<p class="text-xs text-slate-400 italic py-2">Henüz kayıtlı laboratuvar bulunmuyor.</p>';
+                    return;
+                }
+
+                box.innerHTML = bolgeSirasi.map(bolge => {
+                    const grup = labs.filter(l => l.bolge === bolge);
+                    if (!grup.length) return '';
+                    return `
+                        <div class="space-y-1.5">
+                            <div class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">${escapeHtml(bolge)}</div>
+                            ${grup.map(l => `
+                                <div class="bg-stone-950/40 border border-emerald-950/50 rounded-xl p-2.5 text-xs space-y-1">
+                                    <div class="font-bold text-emerald-300">${escapeHtml(l.ad)}</div>
+                                    ${l.aciklama ? `<div class="text-slate-400">${escapeHtml(l.aciklama)}</div>` : ''}
+                                    ${l.telefon ? `<a href="tel:${escapeHtml(l.telefon)}" class="flex items-center text-slate-300 hover:text-emerald-300 transition-colors"><i class="fa-solid fa-phone mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(l.telefon)}</a>` : ''}
+                                    ${l.adres ? `<div class="flex items-center text-slate-400"><i class="fa-solid fa-location-dot mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(l.adres)}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                box.innerHTML = '<p class="text-xs text-rose-300 py-2">Liste şu anda yüklenemedi.</p>';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', fetchSoilLabs);
 
         // ================= HESAP AYARLARI =================
         const accountModal = document.getElementById('account-modal');

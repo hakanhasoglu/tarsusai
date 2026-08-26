@@ -139,6 +139,28 @@
             </section>
         </div>
 
+        <!-- Toprak Analiz Laboratuvarları -->
+        <section class="bg-stone-900/90 border border-emerald-900/30 rounded-2xl p-4 md:p-5 space-y-4">
+            <h2 class="text-xs font-bold tracking-wider text-emerald-400 uppercase">
+                <i class="fa-solid fa-flask-vial mr-1.5"></i>Toprak Analiz Laboratuvarları
+            </h2>
+            <form id="soillab-form" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input type="text" id="lab-ad" placeholder="Laboratuvar Adı" required class="col-span-2 bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                <select id="lab-bolge" required class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                    <option value="Tarsus">Tarsus</option>
+                    <option value="Mersin">Mersin</option>
+                    <option value="Adana">Adana</option>
+                </select>
+                <input type="text" id="lab-telefon" placeholder="Telefon (opsiyonel)" class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                <input type="text" id="lab-adres" placeholder="Adres (opsiyonel)" class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                <input type="text" id="lab-aciklama" placeholder="Açıklama (opsiyonel)" class="bg-stone-950/80 border border-emerald-950 rounded-xl px-3 py-2 text-sm">
+                <button type="submit" class="col-span-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl py-2 font-semibold text-sm">
+                    <i class="fa-solid fa-plus mr-1.5"></i>Laboratuvar Ekle
+                </button>
+            </form>
+            <div id="soillabs-list" class="space-y-2 text-xs"></div>
+        </section>
+
         <!-- Acil Durum SMS -->
         <section class="bg-stone-900/90 border border-amber-700/40 rounded-2xl p-4 md:p-5 space-y-3">
             <h2 class="text-xs font-bold tracking-wider text-amber-400 uppercase">
@@ -205,6 +227,7 @@
                 loadUsers();
                 loadEngineers();
                 loadDealers();
+                loadSoilLabs();
                 loadAuditLog();
                 loadSmsRecipientCount();
             } catch (e) {
@@ -252,6 +275,8 @@
             engineer_delete: 'Mühendis silindi',
             dealer_add: 'Bayi eklendi',
             dealer_delete: 'Bayi silindi',
+            soillab_add: 'Laboratuvar eklendi',
+            soillab_delete: 'Laboratuvar silindi',
             emergency_sms: 'Acil durum SMS gönderildi',
         };
 
@@ -452,6 +477,55 @@
             document.getElementById('deal-ruhsatli').checked = true;
             loadDealers();
             loadStats();
+            loadAuditLog();
+        });
+
+        async function loadSoilLabs() {
+            const box = document.getElementById('soillabs-list');
+            try {
+                const res = await fetch('/api/admin/soil-labs');
+                const rows = await res.json();
+                if (!rows.length) {
+                    box.innerHTML = '<p class="text-slate-500 italic py-1">Henüz kayıtlı laboratuvar yok.</p>';
+                    return;
+                }
+                box.innerHTML = rows.map(l => `
+                    <div class="flex items-center justify-between bg-stone-950/50 border border-emerald-900/30 rounded-xl p-2.5">
+                        <div>
+                            <div class="font-semibold text-emerald-300">${escapeHtml(l.ad)} <span class="text-[9px] text-slate-500">(${escapeHtml(l.bolge)})</span></div>
+                            <div class="text-slate-400">${l.telefon ? escapeHtml(l.telefon) : ''}${l.adres ? ' · ' + escapeHtml(l.adres) : ''}</div>
+                        </div>
+                        <button onclick="deleteSoilLab(${l.id})" class="text-rose-500 hover:text-rose-400 p-1.5"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                box.innerHTML = '<p class="text-rose-300 py-1">Liste yüklenemedi.</p>';
+            }
+        }
+
+        async function deleteSoilLab(id) {
+            if (!confirm('Bu laboratuvarı silmek istediğinize emin misiniz?')) return;
+            await fetch(`/api/admin/soil-labs/${id}`, { method: 'DELETE' });
+            loadSoilLabs();
+            loadAuditLog();
+        }
+
+        document.getElementById('soillab-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = {
+                ad: document.getElementById('lab-ad').value.trim(),
+                bolge: document.getElementById('lab-bolge').value,
+                telefon: document.getElementById('lab-telefon').value.trim() || null,
+                adres: document.getElementById('lab-adres').value.trim() || null,
+                aciklama: document.getElementById('lab-aciklama').value.trim() || null,
+            };
+            await fetch('/api/admin/soil-labs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            e.target.reset();
+            loadSoilLabs();
             loadAuditLog();
         });
 

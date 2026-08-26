@@ -220,6 +220,17 @@ def init_db():
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_log_time ON admin_audit_log (created_at)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS soil_labs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ad TEXT NOT NULL,
+            bolge TEXT NOT NULL,
+            telefon TEXT,
+            adres TEXT,
+            aciklama TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -660,6 +671,17 @@ class PremiumToggleRequest(BaseModel):
     is_premium: bool
 
 
+SOIL_LAB_BOLGELER = ("Tarsus", "Mersin", "Adana")
+
+
+class SoilLabIn(BaseModel):
+    ad: str
+    bolge: str
+    telefon: Optional[str] = None
+    adres: Optional[str] = None
+    aciklama: Optional[str] = None
+
+
 @app.get("/admin")
 async def get_admin_page():
     return FileResponse("admin.html")
@@ -867,6 +889,50 @@ async def admin_delete_dealer(dealer_id: int, req: Request):
     try:
         conn.execute("DELETE FROM dealers WHERE id = ?", (dealer_id,))
         log_admin_action(conn, admin_id, "dealer_delete", target=f"dealer_id={dealer_id}")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/admin/soil-labs")
+async def admin_list_soil_labs(req: Request):
+    require_admin(req)
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM soil_labs ORDER BY bolge, ad").fetchall()
+    finally:
+        conn.close()
+    return [dict(row) for row in rows]
+
+
+@app.post("/api/admin/soil-labs")
+async def admin_add_soil_lab(lab: SoilLabIn, req: Request):
+    admin_id = require_admin(req)
+    bolge = lab.bolge.strip()
+    if bolge not in SOIL_LAB_BOLGELER:
+        raise HTTPException(status_code=400, detail=f"Bölge şunlardan biri olmalı: {', '.join(SOIL_LAB_BOLGELER)}")
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO soil_labs (ad, bolge, telefon, adres, aciklama) VALUES (?, ?, ?, ?, ?)",
+            (lab.ad.strip(), bolge, (lab.telefon or "").strip() or None,
+             (lab.adres or "").strip() or None, (lab.aciklama or "").strip() or None),
+        )
+        log_admin_action(conn, admin_id, "soillab_add", target=f"{bolge} — {lab.ad.strip()}")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/soil-labs/{lab_id}")
+async def admin_delete_soil_lab(lab_id: int, req: Request):
+    admin_id = require_admin(req)
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM soil_labs WHERE id = ?", (lab_id,))
+        log_admin_action(conn, admin_id, "soillab_delete", target=f"soil_lab_id={lab_id}")
         conn.commit()
     finally:
         conn.close()
@@ -1179,6 +1245,18 @@ async def list_dealers():
     finally:
         conn.close()
     return [dict(row) | {"ruhsatli": bool(row["ruhsatli"])} for row in rows]
+
+
+@app.get("/api/soil-labs")
+async def list_soil_labs():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT ad, bolge, telefon, adres, aciklama FROM soil_labs ORDER BY bolge, ad"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(row) for row in rows]
 
 
 @app.get("/api/daily-tip")
