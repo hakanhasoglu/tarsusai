@@ -58,6 +58,9 @@ REGISTER_RATE_LIMIT = (5, 60 * 60)    # 60 dakikada en fazla 5 deneme
 FORGOT_PASSWORD_RATE_LIMIT = (5, 60 * 60)  # 60 dakikada en fazla 5 deneme
 PASSWORD_RESET_TOKEN_TTL_MINUTES = 60
 
+CHAT_HISTORY_RETENTION_DAYS = 30   # sohbet geçmişi 30 günden eski mesajları otomatik siler
+CHAT_HISTORY_CONTEXT_LIMIT = 20    # AI'ya bağlam olarak gönderilen son mesaj sayısı (kullanıcı+asistan karışık)
+
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER")
@@ -169,6 +172,16 @@ def init_db():
             PRIMARY KEY (user_id, usage_date)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user_time ON chat_messages (user_id, created_at)")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS rate_limit_log (
             ip TEXT NOT NULL,
@@ -890,6 +903,43 @@ def increment_chat_usage(user_id: int) -> int:
         conn.close()
 
 
+def get_recent_chat_history(user_id: int) -> list[dict]:
+    """Son CHAT_HISTORY_RETENTION_DAYS gün içindeki en fazla CHAT_HISTORY_CONTEXT_LIMIT
+    mesajı, en eskiden en yeniye sıralı döndürür — Gemini'ye bağlam olarak gönderilir."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT role, content FROM chat_messages WHERE user_id = ? AND created_at >= datetime('now', ?) "
+            "ORDER BY created_at DESC LIMIT ?",
+            (user_id, f"-{CHAT_HISTORY_RETENTION_DAYS} days", CHAT_HISTORY_CONTEXT_LIMIT),
+        ).fetchall()
+        return [dict(row) for row in reversed(rows)]
+    finally:
+        conn.close()
+
+
+def save_chat_turn(user_id: int, user_content: str, assistant_content: str):
+    """Kullanıcı sorusunu ve asistan cevabını kaydeder; aynı işlemde 30 günden
+    eski geçmişi de temizler (ayrı bir cron job gerekmez)."""
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO chat_messages (user_id, role, content) VALUES (?, 'user', ?)",
+            (user_id, user_content),
+        )
+        conn.execute(
+            "INSERT INTO chat_messages (user_id, role, content) VALUES (?, 'assistant', ?)",
+            (user_id, assistant_content),
+        )
+        conn.execute(
+            "DELETE FROM chat_messages WHERE created_at < datetime('now', ?)",
+            (f"-{CHAT_HISTORY_RETENTION_DAYS} days",),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def get_or_create_daily_tip(today: date) -> dict:
     conn = get_db()
     try:
@@ -1051,8 +1101,12 @@ async def chat_endpoint(request: ChatRequest, req: Request):
             temperature=0.6,
         )
 
-        # Gemini'ye gönderilecek içerik listesi
+        # Gemini'ye gönderilecek içerik listesi — önce son 30 günün sohbet geçmişini
+        # bağlam olarak ekliyoruz, böylece model önceki mesajları hatırlıyor.
         contents = []
+        for msg in get_recent_chat_history(user_id):
+            role = "model" if msg["role"] == "assistant" else "user"
+            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
 
         # Eğer görsel varsa işleyelim
         if request.image:
@@ -1096,6 +1150,9 @@ async def chat_endpoint(request: ChatRequest, req: Request):
             title="[violet]Ziraat Mühendisi Tavsiyesi[/violet]",
             border_style="violet"
         ))
+
+        history_user_text = request.message.strip() if request.message else "[Görsel gönderildi: bitki/hastalık teşhisi istendi]"
+        save_chat_turn(user_id, history_user_text, response.text)
 
         new_count = increment_chat_usage(user_id)
         remaining = None if premium else max(0, FREE_DAILY_CHAT_LIMIT - new_count)
