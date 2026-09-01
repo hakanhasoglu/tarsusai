@@ -400,7 +400,7 @@
                         <i class="fa-solid fa-flask-vial mr-2"></i> Toprak Analiz Laboratuvarları
                     </span>
                 </div>
-                <div id="soillabs-list" class="space-y-3">
+                <div id="soillabs-list" class="space-y-2">
                     <div class="flex items-center justify-center py-4 space-x-2 text-emerald-400 text-sm italic">
                         <i class="fa-solid fa-spinner animate-spin"></i>
                         <span>Yükleniyor...</span>
@@ -410,13 +410,17 @@
 
             <!-- Canlı Hal Borsa Fiyatları -->
             <div class="bg-stone-900/90 backdrop-blur-md border border-emerald-900/30 rounded-2xl p-4 flex flex-col space-y-3 shadow-xl shadow-emerald-950/10">
-                <div class="flex items-center justify-between border-b border-emerald-900/25 pb-2">
+                <button type="button" class="halfiyat-toggle flex items-center justify-between gap-2 border-b border-emerald-900/25 pb-2 w-full text-left" aria-expanded="true">
                     <span class="text-xs font-bold tracking-wider text-emerald-400 uppercase flex items-center">
                         <i class="fa-solid fa-scale-balanced mr-2"></i> Tarsus Hal Fiyatları
                     </span>
-                    <span class="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/45 font-semibold">21.08.2026</span>
-                </div>
+                    <span class="flex items-center gap-2 shrink-0">
+                        <span class="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/45 font-semibold">21.08.2026</span>
+                        <i class="fa-solid fa-chevron-down halfiyat-chevron text-emerald-500 text-[10px] transition-transform" style="transform:rotate(180deg)"></i>
+                    </span>
+                </button>
 
+              <div class="halfiyat-body flex flex-col space-y-3">
                 <div class="space-y-2 text-xs">
                     <div class="flex justify-between items-center bg-stone-950/40 p-2 rounded-xl border border-emerald-950/50">
                         <span class="text-slate-300 font-medium">🥕 Havuç</span>
@@ -456,6 +460,7 @@
                     </div>
                 </div>
                 <p class="text-[9px] text-slate-500 italic text-center">Fiyatlar Tarsus Hal Kompleksi 21.08.2026 verileridir. Kaynak: mersin.bel.tr</p>
+              </div>
             </div>
 
             <!-- Zirai İlaç Bayileri -->
@@ -1244,20 +1249,31 @@
                     return;
                 }
 
+                let acilanIlkGrup = false;
                 box.innerHTML = bolgeSirasi.map(bolge => {
                     const grup = labs.filter(l => l.bolge === bolge);
                     if (!grup.length) return '';
+                    const acik = !acilanIlkGrup;          // sadece ilk dolu bölge açık başlar
+                    acilanIlkGrup = true;
                     return `
-                        <div class="space-y-1.5">
-                            <div class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">${escapeHtml(bolge)}</div>
-                            ${grup.map(l => `
-                                <div class="bg-stone-950/40 border border-emerald-950/50 rounded-xl p-2.5 text-xs space-y-1">
-                                    <div class="font-bold text-emerald-300">${escapeHtml(l.ad)}</div>
-                                    ${l.aciklama ? `<div class="text-slate-400">${escapeHtml(l.aciklama)}</div>` : ''}
-                                    ${l.telefon ? `<a href="tel:${escapeHtml(l.telefon)}" class="flex items-center text-slate-300 hover:text-emerald-300 transition-colors"><i class="fa-solid fa-phone mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(l.telefon)}</a>` : ''}
-                                    ${l.adres ? `<div class="flex items-center text-slate-400"><i class="fa-solid fa-location-dot mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(l.adres)}</div>` : ''}
-                                </div>
-                            `).join('')}
+                        <div class="soillab-group border border-emerald-950/50 rounded-xl overflow-hidden bg-stone-950/40">
+                            <button type="button" class="soillab-toggle w-full flex items-center justify-between gap-2 p-2.5 text-left hover:bg-stone-950/70 transition-colors" aria-expanded="${acik}">
+                                <span class="text-xs font-bold text-emerald-300 flex items-center">
+                                    <i class="fa-solid fa-flask-vial mr-1.5 text-emerald-500"></i>${escapeHtml(bolge)} Analiz Laboratuvarları
+                                    <span class="ml-1.5 text-[10px] font-normal text-slate-500">(${grup.length})</span>
+                                </span>
+                                <i class="fa-solid fa-chevron-down soillab-chevron text-emerald-500 text-[10px] transition-transform shrink-0" style="${acik ? 'transform:rotate(180deg)' : ''}"></i>
+                            </button>
+                            <div class="soillab-body divide-y divide-emerald-950/40 ${acik ? '' : 'hidden'}">
+                                ${grup.map(l => `
+                                    <div class="p-2.5 text-xs space-y-1">
+                                        <div class="font-bold text-emerald-300">${escapeHtml(l.ad)}</div>
+                                        ${l.aciklama ? `<div class="text-slate-400">${escapeHtml(l.aciklama)}</div>` : ''}
+                                        ${l.telefon ? `<a href="tel:${escapeHtml(l.telefon)}" class="flex items-center text-slate-300 hover:text-emerald-300 transition-colors"><i class="fa-solid fa-phone mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(l.telefon)}</a>` : ''}
+                                        ${l.adres ? `<div class="flex items-center text-slate-400"><i class="fa-solid fa-location-dot mr-1.5 text-emerald-500 w-3"></i>${escapeHtml(l.adres)}</div>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -1266,7 +1282,33 @@
             }
         }
 
+        // Accordion: bölge başlığına tıklayınca aç/kapa (event delegation — yeniden render'a dayanıklı)
+        document.getElementById('soillabs-list').addEventListener('click', (e) => {
+            const btn = e.target.closest('.soillab-toggle');
+            if (!btn) return;
+            const body = btn.nextElementSibling;
+            const chevron = btn.querySelector('.soillab-chevron');
+            const acik = !body.classList.contains('hidden');
+            body.classList.toggle('hidden', acik);
+            btn.setAttribute('aria-expanded', String(!acik));
+            chevron.style.transform = acik ? '' : 'rotate(180deg)';
+        });
+
         window.addEventListener('DOMContentLoaded', fetchSoilLabs);
+
+        // Tarsus Hal Fiyatları: başlığa tıklayınca aç/kapa
+        (function () {
+            const btn = document.querySelector('.halfiyat-toggle');
+            if (!btn) return;
+            const body = document.querySelector('.halfiyat-body');
+            const chevron = btn.querySelector('.halfiyat-chevron');
+            btn.addEventListener('click', () => {
+                const acik = !body.classList.contains('hidden');
+                body.classList.toggle('hidden', acik);
+                btn.setAttribute('aria-expanded', String(!acik));
+                chevron.style.transform = acik ? '' : 'rotate(180deg)';
+            });
+        })();
 
         // ================= HESAP AYARLARI =================
         const accountModal = document.getElementById('account-modal');
