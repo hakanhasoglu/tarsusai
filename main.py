@@ -1206,6 +1206,13 @@ async def get_index():
     return FileResponse("index.html")
 
 
+@app.get("/og-image.png")
+async def get_og_image():
+    """Sosyal medya (WhatsApp/Messenger/Twitter) link önizleme görseli."""
+    return FileResponse("og-image.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/api/health")
 async def health_check():
     """Uptime izleme servisleri için hafif kontrol noktası. Kimlik doğrulama gerektirmez."""
